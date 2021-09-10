@@ -822,6 +822,276 @@ n/..
 
 #### 观察硬盘分区状态
 
+使用lsblk列出所有存储设备
+
+-i 代表使用ascii码
+
+-p 代表输出完整名称不仅仅是最后的名称
+
+>[root@YH ~]# lsblk
+>NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+>sr0     11:0    1 141.4M  0 rom  
+>vda    253:0    0    50G  0 disk 
+>└─vda1 253:1    0    50G  0 part /
+
+- NAME       代表设备文件名，会自动省略dev
+- MAJ:MIN    代表设备是通过两个代码来实现的,分别是主要设备和次要设备
+- RM         代表是否可卸载
+- SIZE       代表最大容量
+- RO         代表是否为只读设备
+- TYPE       代表是硬盘(disk)还是分区(part)或是只读存储器(rom)等输出
+- MOUNTPOINT 代表挂载目录
+
+
+
+使用blkid来列出设备的UUID等参数
+
+>[root@YH ~]# blkid
+>/dev/sr0: UUID="2021-08-14-17-43-46-00" LABEL="config-2" TYPE="iso9660" 
+>/dev/vda1: UUID="4b499d76-769a-40a0-93dc-4a31a59add28" TYPE="ext4" 
+
+
+
+parted列出磁盘分区表类型与分区信息
+
+
+
+### 建议的分区操作
+
+先使用lsblk找到磁盘
+
+使用blkid 磁盘  进行查看磁盘类型 或是使用parted 磁盘
+
+==如果要进行分区注意了fdisk是MBR的分区表,而gdisk是GPT的分区表---!!!千万不要在MBR上面使用gdisk也不要在GPT上面使用fdisk==
+
+使用fdisk或是gdisk进行分区
+
+分区前先用p进行查看分区情况查看section的位置以免覆盖,使用n可以新建分区
+
+<建议上面的操作用帮助先验证是否正确>
+
+在使用w之前都可以用q退出来撤销,分区完后使用w进行写入,由于硬盘可能在使用中所以分区可能不会发生需要用重启或者partpeobe这个命令进行更新Linux内核信息-s会显示出来
+
+
+
+==parted也可以进行分区==
+
+
+
+使用fdisk进行分区
+
+>由于我的linux采用的是ext4所有暂时先介绍fdisk
+>
+>
+
+```bash
+================首先使用这个命令进入分区系统============
+
+[root@YH local]# fdisk /dev/vda
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+================d代表删除分区===============
+Command (m for help): d
+Selected partition 1
+Partition 1 is deleted
+============然后再新建一个分区===========
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+Partition number (1-4, default 1): 
+==========默认即可========
+First sector (2048-104857599, default 2048): 
+Using default value 2048
+=============最后的区号=============
+Last sector, +sectors or +size{K,M,G} (2048-104857599, default 104857599): 83886079
+Partition 1 of type Linux and of size 40 GiB is set
+
+====================进行第二个分区=================
+Command (m for help): n
+Partition type:
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended
+Select (default p): p
+Partition number (2-4, default 2): 
+First sector (83886080-104857599, default 83886080): 
+Using default value 83886080
+Last sector, +sectors or +size{K,M,G} (83886080-104857599, default 104857599): 
+Using default value 104857599
+Partition 2 of type Linux and of size 10 GiB is set
+=================写入分区=================
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+
+WARNING: Re-reading the partition table failed with error 16: Device or resource busy.
+The kernel still uses the old table. The new table will be used at
+the next reboot or after you run partprobe(8) or kpartx(8)
+Syncing disks.
+
+==============使用这个命令更新分区表===============
+[root@YH local]# partprobe
+Warning: Unable to open /dev/sr0 read-write (Read-only file system).  /dev/sr0 has been opened read-only.
+[root@YH local]# lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sr0     11:0    1 141.4M  0 rom  
+vda    253:0    0    50G  0 disk 
+├─vda1 253:1    0    40G  0 part /
+└─vda2 253:2    0    10G  0 part 
+[root@YH local]# blkid 
+/dev/sr0: UUID="2021-09-10-09-46-39-00" LABEL="config-2" TYPE="iso9660" 
+/dev/vda1: UUID="4b499d76-769a-40a0-93dc-4a31a59add28" TYPE="ext4" 
+[root@YH local]# parted /dev/vda
+GNU Parted 3.1
+Using /dev/vda
+Welcome to GNU Parted! Type 'help' to view a list of commands.
+(parted) print                                                            
+Model: Virtio Block Device (virtblk)
+Disk /dev/vda: 53.7GB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type     File system  Flags
+ 1      1049kB  42.9GB  42.9GB  primary  ext4
+ 2      42.9GB  53.7GB  10.7GB  primary
+
+(parted) q                                                                
+
+```
+
+
+
+分区后进行格式化
+
+使用mkfs
+
+>[root@YH dev]# mkfs
+>mkfs         mkfs.btrfs   mkfs.cramfs  mkfs.ext2    mkfs.ext3    mkfs.ext4    mkfs.minix   mkfs.xfs  
+
+用tab tab可以查看出可以使用上面这个分区格式化命令(如果要进行格式化的分区已经存在文件系统需要加-f进行强制格式化)
+
+
+
+#### 如果发生了意外导致关机
+
+需要使用xfs_repair处理xfs文件系统
+
+至于ext4则使用fsck.ext4进行处理
+
+要使用上面的命令进行扫描磁盘不能挂载必须卸载
+
+
+
+### 文件系统的挂载与卸载
+
+挂载
+
+- 单一文件系统不应该重复挂载
+- 单一目录不应该重复挂载多个文件系统
+- 要作为挂载点的目录,理论上要空目录才行
+
+> 挂载了文件系统之后原目录下的东西会暂时消失
+
+- mount:挂载命令
+
+  ```bash
+  [root@YH dev]# blkid
+  /dev/sr0: UUID="2021-09-10-09-46-39-00" LABEL="config-2" TYPE="iso9660" 
+  /dev/vda1: UUID="4b499d76-769a-40a0-93dc-4a31a59add28" TYPE="ext4" 
+  /dev/vda2: UUID="77514366-9351-4fa2-b27e-7458d242e76c" TYPE="xfs" 
+  [root@YH dev]# mkdir -p /usr/local/YH
+  [root@YH dev]# cd /usr/local
+  [root@YH local]# ls
+  bin  etc  games  include  lib  lib64  libexec  qcloud  sbin  share  src  yd.socket.server  YH
+  [root@YH local]# mount UUID="77514366-9351-4fa2-b27e-7458d242e76c" /usr/local/YH
+  [root@YH local]# df /usr/local/YH
+  Filesystem     1K-blocks  Used Available Use% Mounted on
+  /dev/vda2       10475520  8276  10467244   1% /usr/local/YH
+  
+  ```
+
+  如果挂载u盘则不能是NTFS格式
+
+- remount:重新挂载
+
+- umount:卸载
+
+  - -f 强制卸载
+  - -l 立即卸载(强制性再-f之上)
+
+如果想要改为开机挂载需要修改/etc/fstab文件,但是实际的挂载文件在/etc/mtab内,但是如果fstab这个文件出现语法错误会导致无法开机
+
+```bash
+[root@YH ~]# cat /etc/fstab
+
+#
+# /etc/fstab
+# Created by anaconda on Thu Mar  7 06:38:37 2019
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=4b499d76-769a-40a0-93dc-4a31a59add28 /                       ext4    defaults        1 1
+==文件名==                               ==挂载目录==            ==文件系统==
+```
+
+
+
+
+
+需要进入担任维护模式运行
+
+>mount -n -o remount,rw
+
+### 磁盘/文件参数
+
+硬盘上主要通过major与minor数值代表设备
+
+例如:
+
+```bash
+[root@YH local]# lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sr0     11:0    1 141.4M  0 rom  
+vda    253:0    0    50G  0 disk 
+├─vda1 253:1    0    40G  0 part /
+└─vda2 253:2    0    10G  0 part /usr/local/YH
+```
+
+253代表主设备代码(major)而0代表次设备代码(minor)
+
+
+
+- mknod:可以设置major与minor
+- xfs_admin:可以修改设备的UUID与Label name
+- tune2fs:修改ext4的UUID和Lable
+
+### 内存交换分区
+
+按照物理分区进行划分
+
+1. 分区
+2. 格式化 mkswap:格式化为交换分区
+3. 使用,将该分区启动 swapon:启动
+4. 观察通过free与swapon -s
+
+
+
+使用文件创建内存交换文件
+
+1. 使用dd命令在/tmp下面新增一个文件
+2. 使用mkswap 将新建的文件转换为内存交换文件格式
+3. 使用swapon
+4. 使用swapoff关闭并设置自动启用
+
+
+
 
 
 ## 进程管理
@@ -961,6 +1231,7 @@ firewall-cmd --list-ports查看开启
   - /group:所有组个名在这里面
   - /locale.conf:可以修改系统语言
   - /opt:这个目录在防止第三方辅助软件/opt的相关配置文件
+  - /filesystems:系统指定的测试挂载文件系统类型的优先级
   - /sysconfig
     - /network-scripts:网络配置目录
 - /var
@@ -975,6 +1246,8 @@ firewall-cmd --list-ports查看开启
 - /run或/tmp数据接口文件常用来通过soocket来进行数据沟通
 - /lib:(放置的是启动时会用到的库函数,以及在/bin和/sbin下面的命令会调用的库函数)
   - /modules:放置驱动程序
+    - $(uname -r)/kernel/fs
+      - 例如ext4驱动就在/lib/modules/$(uname -r)/kernel/fs/ext4下
 - /opt:(给第三方辅助软件防止的目录也有可能有人习惯安装在/usr/local下)
 - /sbin:(很多命令是用来设置系统环境的,这些命令只有root才能设置系统里面包含了修复启动还原系统所需要的命令)
   - 某些服务器软件程序放置在/usr/sbin中.本机自行安装的软件所产生中的系统执行文件,则放置到/usr/local/sbin
@@ -982,4 +1255,5 @@ firewall-cmd --list-ports查看开启
 - /home:(普通用户的家,~回到这个目录下的指定文件)
 - /root:(root用户的家)
 - /proc:(系统的信息例如内核、进程信息、外接设备、网络状况，他防止的数据都在内存中)
+  - filesystems:Linux已经加载的文件系统类型
 - /sys:不占硬盘容量也是保存系统信息的.
