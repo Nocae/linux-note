@@ -536,7 +536,7 @@ umask 设置默认减掉的权限例如umask 777则变成新建文件什么权�
 - -f:直接列出结果，而不进行排序（ls默认会以文件名排序）
 - -F:根据文件、目录等信息，给予附加数据结构
   - *:代表可执行文件；/:代表目录；=:代表socket文件；|:代表FIFO文件
--l:详细信息显示，包含文件的属性与权限等数据（常用）
+  -l:详细信息显示，包含文件的属性与权限等数据（常用）
 
 
 ### 目录处理命令
@@ -1135,33 +1135,8 @@ vda    253:0    0    50G  0 disk
   - 用法同上
   - 读取用xzcat
   
-- dd:
-
-  - if(input file):可以是设备
-
-  - of(output file):可以是设备
-
-  - bs:设置一个block的大小,默认512Bytes(一个扇区大小)
-
-  - count多少个bs
-
-  - > dd if=/dev/zero of=/usr/local/YH/test.img bs=1M count=10
-    >10+0 records in
-    >10+0 records out
-    >
-    >例如上面这个例子代表将/dev/zero备份到/usr/local/YH/test.img 每个分区为1M 设置10个分区 下面10+0代表10个完整的1M以及0个未满1M的意思
-
-    使用dd复制后如果发现无法使用某些分区或者文件系统使用下面的命令
-
-    >xfs_repair -L /dev/sda1 #清理log
-    >
-    >uuidgen 获得新的uuid
-    >
-    >xfs_admin -U 新获得的UUID 设备驱动
-    >
-    >由于dd连uuid也一起复制二xfs主要使用uuid来区分文件系统所以要在给一个uuid
-
-- cpio:以后再说
+  
+  
 
 **源文件**
 
@@ -1282,6 +1257,10 @@ tar -jcv -f /root/system.tar.bz2 --exclude=/root/etc*
 
 
 
+### 备份
+
+
+
 #### 仅备份比某个时候更新的文件
 
 --newer(包含mtime与ctime)
@@ -1351,7 +1330,107 @@ xfsrestore [-f 备份文件] -r 待恢复目录
 
 
 
+- dd:
 
+  - if(input file):可以是设备
+
+  - of(output file):可以是设备
+
+  - bs:设置一个block的大小,默认512Bytes(一个扇区大小)
+
+  - count多少个bs
+
+  - > dd if=/dev/zero of=/usr/local/YH/test.img bs=1M count=10
+    > 10+0 records in
+    > 10+0 records out
+    >
+    > 例如上面这个例子代表将/dev/zero备份到/usr/local/YH/test.img 每个分区为1M 设置10个分区 下面10+0代表10个完整的1M以及0个未满1M的意思
+
+    使用dd复制后如果发现无法使用某些分区或者文件系统使用下面的命令
+
+    >xfs_repair -L /dev/sda1 #清理log
+    >
+    >uuidgen 获得新的uuid
+    >
+    >xfs_admin -U 新获得的UUID 设备驱动
+    >
+    >由于dd连uuid也一起复制二xfs主要使用uuid来区分文件系统所以要在给一个uuid
+
+- cpio:以后再说
+
+
+
+## shell
+
+### vim的缓存与恢复
+
+当我们编辑文件时会在与编辑的目录下生成一个.filename.swp的文件,例如
+
+vi /YH.txt 会有.YH.text.swp 这个文件就是用来记录修改信息的
+
+如果发生意外vim中断下次进入时按R即可恢复缓存内容但是那个缓存文件需要你自己删除否则会一直警告
+
+如果这个缓存没用了按D进行删除vim会自己再建立一个
+
+> 注意vi与vim不一样有的时候系统默认vi就是vim使用alias命令即可查看
+>
+> [root@YH vitest]# alias
+> alias cp='cp -i'
+> alias egrep='egrep --color=auto'
+> alias fgrep='fgrep --color=auto'
+> alias grep='grep --color=auto'
+> alias l.='ls -d .* --color=auto'
+> alias ll='ls -l --color=auto'
+> alias ls='ls --color=auto'
+> alias mv='mv -i'
+> alias rm='rm -i'
+> alias which='alias | /usr/bin/which --tty-only --read-alias --show-dot --show-tilde'
+
+区块编辑
+
+移动到区块最开始的位置按下ctrl+v然后移动光标会这样
+
+![image-20210912110828669](C:\Users\lll\AppData\Roaming\Typora\typora-user-images\image-20210912110828669.png)
+
+按下y进行复制按p可以粘贴
+
+### 多文件编辑
+
+vim可以使用 vim [file1] [file2]进行同时编辑
+
+使用:files可以显示所有要编辑的文件
+
+>:files
+>1 %a   "man.test.conf"                line 1
+>2      "/etc/host"                    line 0
+>Press ENTER or type command to continue
+
+
+
+### 多窗口编辑
+
+| 命令                 | 结果                                                       |
+| -------------------- | ---------------------------------------------------------- |
+| :sp [filename]       | 添加一个窗口不加filename就是创建两个窗口但是同一文件       |
+| ctrl+w+↑或者ctrl+w+↓ | 进行窗口的切换                                             |
+| ctrl+x               | 下方弹出所有的可补全提示常用的有ctrl+o以文件扩展名方式补充 |
+| :set nu              | 设置与取消行号,nonu取消行号                                |
+| :set autoindent      | 设置是否自动缩进,noautoindent不缩进                        |
+| :set all             | 显示目前所有的环境参数设置值                               |
+
+![img](https://img2018.cnblogs.com/blog/1442837/201811/1442837-20181121151226556-202455126.png)
+
+
+
+### 中文乱码问题
+
+- 系统默认的语言:/etc/locale.conf
+
+- bash的语系:LANG、LC_ALL变量有关
+
+- 文件原本编码
+- 打开终端的软件
+- 使用iconv进行转码
 
 
 
@@ -1504,6 +1583,8 @@ firewall-cmd --list-ports查看开启
 - /var：系统运行后占用硬盘容量的目录
   - /cache:应用程序本身运行过程中产生的一些缓存
   - /lib:程序本身执行过程中，需要使用到的数据文件放置的目录。此目录下各自软件要有各自的目录
+    - /xfsdump
+      - /inventory:xfsdump的备份记录
   - /lock：防止设备或文件同一时刻被多用户使用，使用时给该设备上锁，确保该设备只给单一软件使用（已经转移到/run/lock中）
   - /run：程序或服务启动后，将PID放置到这个目录，与/run相同，链接到/run目录
   - /mail：个人用户邮箱，也被放置到/var/spool/mail目录，通常这两个目录互为链接文件
