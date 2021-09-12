@@ -1,3 +1,5 @@
+
+
  # Linux
 
 ## 各种设备在linux的文件名
@@ -881,8 +883,6 @@ parted列出磁盘分区表类型与分区信息
 使用fdisk进行分区
 
 >由于我的linux采用的是ext4所有暂时先介绍fdisk
->
->
 
 ```bash
 ================首先使用这个命令进入分区系统============
@@ -1089,6 +1089,253 @@ vda    253:0    0    50G  0 disk
 2. 使用mkswap 将新建的文件转换为内存交换文件格式
 3. 使用swapon
 4. 使用swapoff关闭并设置自动启用
+
+
+
+## 鸭缩
+
+常见的鸭缩格式有\*.z \*.zip \*.gz \*.bz2 \*.xz \*.tar \*.tar.gz \*.tar.bz2 \*.tar.xz
+
+其中\*.tar代表打包程序,\*.z \*.zip \*.gz \*.bz2 \*.xz代表鸭缩文件, \*.tar.gz这种代表先打包后鸭缩
+
+> 由于鸭缩一次只能鸭缩一个文件所以才要用tar对多个文件进行打包
+
+
+
+### 鸭缩命令
+
+- gzip:
+  - -c数据输出可以数据流定向 
+  - -d 解吖缩
+  - -t 验证一致性 
+  - -v 鸭缩比 
+  - -#鸭缩等级 1最快,鸭缩比最差 9最慢 
+  - 默认情况下用gzip鸭缩后源文件不在了
+  - 读取用zcat
+  
+- bzip2:
+  - 参数同上
+  - 读取用bzcat
+  
+- xz:
+  - 用法同上
+  - 读取用xzcat
+  
+- dd:
+
+  - if(input file):可以是设备
+
+  - of(output file):可以是设备
+
+  - bs:设置一个block的大小,默认512Bytes(一个扇区大小)
+
+  - count多少个bs
+
+  - > dd if=/dev/zero of=/usr/local/YH/test.img bs=1M count=10
+    >10+0 records in
+    >10+0 records out
+    >
+    >例如上面这个例子代表将/dev/zero备份到/usr/local/YH/test.img 每个分区为1M 设置10个分区 下面10+0代表10个完整的1M以及0个未满1M的意思
+
+    使用dd复制后如果发现无法使用某些分区或者文件系统使用下面的命令
+
+    >xfs_repair -L /dev/sda1 #清理log
+    >
+    >uuidgen 获得新的uuid
+    >
+    >xfs_admin -U 新获得的UUID 设备驱动
+    >
+    >由于dd连uuid也一起复制二xfs主要使用uuid来区分文件系统所以要在给一个uuid
+
+- cpio:以后再说
+
+**源文件**
+
+```bash
+[root@YH YH]# ls -als
+total 88682
+    0 drwxr-xr-x   2 root root       81 Sep 11 09:03 .
+    4 drwxr-xr-x. 14 root root     4096 Sep 10 10:45 ..
+    1 -rw-r--r--   1 root root       46 Sep 11 08:43 1.txt.gz
+88677 -rw-r--r--   1 root root 90805089 Jan 20  2018 Java语言程序设计.进阶篇.原书第10版.pdf
+```
+
+**用gzip鸭缩后**
+
+```bash
+[root@YH YH]# ls -alsr
+total 71500
+71495 -rw-r--r--   1 root root 73210438 Jan 20  2018 Java语言程序设计.进阶篇.原书第10版.pdf.gz
+    1 -rw-r--r--   1 root root       46 Sep 11 08:43 1.txt.gz
+    4 drwxr-xr-x. 14 root root     4096 Sep 10 10:45 ..
+    0 drwxr-xr-x   2 root root       84 Sep 11 09:03 .
+```
+
+鸭缩比19.4%
+
+
+
+**用bzip2:**
+
+> 1.262:1,  6.338 bits/byte, 20.78% saved, 90805089 in, 71940276 out.
+
+
+
+**用xz:**
+
+>  100 %         66.3 MiB / 86.6 MiB = 0.766   2.2 MiB/s       0:39 
+
+
+
+### 打包命令
+
+- tar:
+
+  - -c 建立打包文件
+  - -t 查看打包文件的内容有哪些文件名
+  - -x 解包或解吖缩
+  - -z 通过gzip的支持进行鸭缩或者解吖
+  - -j 通过bzip2的支持进行鸭缩或解吖
+  - -J 通过xz的支持进行鸭缩或解吖
+  - -v 鸭缩与解吖过程中的文件名显示出来
+  - **-f 后面要立即接要被处理的文件名**
+  - -C 解吖到指定文件目录
+  - -p 保留碑文数据的原本权限与属性
+  - -P 保留绝对路径允许备份数据中含有根目录存在之意
+
+- 常用的tar命令
+
+  - 鸭缩:tar -jcv -f filename.tar.bz2 要被鸭缩的文件或目录;
+  - 查询:tar -jtv -f filename.tar.bz2;
+  - 解吖缩:tar -jxv -f filename.tar.bz2 -C 要解压的目录
+  - 解开单一文件:
+    - tar -jtv -f /root/etc.tar.bz2 | grep '要解吖的文件名' 这样可以查出来
+    - tar -jxv -f 打包的文件.tar.bz2 待解开的文件名
+
+  注意鸭缩的时候最好自己加上.tar.[bz2|xz|gz]
+
+
+
+==建议经常使用tar备份etc==
+
+time tar -zpcv -f etc.tar.gz /etc
+
+```bash
+real	0m3.923s
+user	0m1.125s
+sys	0m0.097s
+```
+
+
+
+time tar -jpcv -f etc.tar.bz2 /etc
+
+```bash
+real	0m2.945s
+user	0m2.838s
+sys	0m0.053s
+```
+
+
+
+time tar -Jpcv -f etc.tar.xz /etc
+
+```bash
+real	0m12.140s
+user	0m11.764s
+sys	0m0.129s
+```
+
+原本大小
+
+> 37MB	/etc
+
+```bash
+-rw-r--r--   1 root root  9453958 Sep 11 10:08 etc.tar.bz2
+-rw-r--r--   1 root root 10732764 Sep 11 10:04 etc.tar.gz
+-rw-r--r--   1 root root  7632840 Sep 11 10:09 etc.tar.xz
+```
+
+
+
+#### 如果要打包目录但是不包含某些文件
+
+tar -jcv -f /root/system.tar.bz2 --exclude=/root/etc*
+
+--exclude=不想要包含的文件
+
+*代表通配符
+
+
+
+#### 仅备份比某个时候更新的文件
+
+--newer(包含mtime与ctime)
+
+--newer-mtime(只能用mtime)
+
+- atime:***\*显示的是文件中的数据最后被访问的时间\****
+- mtime:***\*显示的是文件内容被修改的最后时间\****
+- ctime:***\*显示的是文件的权限、拥有者、所属的组、链接数改变、文件内容改变的时间。\****
+
+> 通常所说的tarfile代表只进行打包,tarbali代表打包鸭缩
+
+
+
+#### 关于SELinux问题
+
+SELinux可能会让你的系统无法读写配置文件,导致影响到系统的正常使用
+
+如果使用上面的方法进行备份恢复但是无法正常使用可能是/etc/shadow这个密码文件的SELinux类在还原时被修改了导致无法正常登录
+
+处理方法:
+
+- 方法一:修改/etc/selinux/config文件将SELinux改成permissive模式重启;
+- 方法二:在第一次恢复系统后不要立即重启先使用restorecon -Rv /etc 自动修复一下SELinux即可
+- 方法三:通过各种可行的方式登录系统,建立/.autorelabel文件,重新启动后系统会自动修复SELinux并会再次重启后正常
+
+
+
+#### XFS文件系统的备份与还原
+
+xfsdump命令：增量备份,与git差不多显示出与上一份增加的文件的差异
+
+记录文件放在/var/lib/xfsdump/inventory
+
+注意:
+
+- 不支持没有挂载的文件系统备份
+- 必须使用root
+- 只能备份xfs
+- 备份的数据只能用xfsrestore解析
+- 通过UUID来识别各个备份文件
+- 支持文件系统的备份并不支持特定目录的备份,不能备份/etc
+
+备份测试
+
+```bash
+xfsdump -l 0 -L vda2_all -M vda2_all -f /vda2.dump /usr/local/YH
+进行备份
+
+xfsdump -I
+查看结果
+
+dd if=/dev/zero of=/usr/local/YH/test.img bs=1M count=10
+新增文件
+
+ xfsdump -l 1 -L vda2_2 -M vda2_2 -f /vda2.dump1 /usr/local/YH
+再次新增
+//注意只有建立过-l 0 才能-l [1~9]进行增量备份
+
+```
+
+
+
+使用-xfsrestore进行恢复
+
+xfsrestore [-f 备份文件] -r 待恢复目录
+
+
 
 
 
