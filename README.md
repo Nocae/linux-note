@@ -2,9 +2,7 @@
 
 
  # Linux
-=======
-# Linux
->>>>>>> ff724d07f7d17d8c565e03e625d14b10588010ba
+
 
 ## 各种设备在linux的文件名
 
@@ -1360,7 +1358,7 @@ xfsrestore [-f 备份文件] -r 待恢复目录
 
 
 
-## shell
+## vim
 
 ### vim的缓存与恢复
 
@@ -1431,6 +1429,221 @@ vim可以使用 vim [file1] [file2]进行同时编辑
 - 文件原本编码
 - 打开终端的软件
 - 使用iconv进行转码
+
+
+
+## Shell
+
+查看可使用的shell
+
+/etc/shells这个文件
+
+再/etc/passwd这个文件中最后一个内容代表登陆后使用的shell类型
+
+![image-20210913091729821](C:\Users\lll\AppData\Roaming\Typora\typora-user-images\image-20210913091729821.png)
+
+- 对于shell一般能存1000条命令,对于上次登陆的命令都留在~/.bash_history,而这一次都放在内存中
+- 如果安装了bash-completion按tab时可以进行(选项/参数补齐)功能
+- alise别名功能,举个例子 ll=ls -l --color=auto
+
+- 使用type来查看是否为内置命令
+  - type [-tpa] name
+  - -t 会显示一些其他属性
+  - -p 如果接name为外部命令才会显示完整名称
+  - -a 会由path变量定义的路径中所有含有name的命令都列出来
+
+### 环境变量
+
+使用echo $PATH可以输出PATH变量
+
+使用=可以对环境变量进行改变
+
+> [root@YH mail]# YH=1
+>
+> [root@YH mail]# echo $YH
+> 1
+
+但是必须符合以下规则
+
+- 变量与变量内容必须用=连接
+
+- 等号两边不能有空格
+
+- 变量名只能是字母或数字,但是不能是数字开头
+
+- 双引号内如果有特殊字符,则会保留原意
+
+  - >[root@YH ~]# YH=$PATH
+    >[root@YH ~]# echo $YH
+    >/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+
+- 单引号内如果有特殊字符则不会保留原意
+
+  - >[root@YH ~]# YH='$PATH'
+    >[root@YH ~]# echo $YH
+    >$PATH
+
+- 使用``或者$()可以在命令中使用命令
+
+  - > cd /lib/modules/\`uname -r\`/kernel
+    >
+    > 其中uname -r的值为
+    >
+    > [root@YH kernel]# uname -r
+    > 3.10.0-1160.11.1.el7.x86_64
+
+- 使用unset进行取消设置
+
+
+
+shell一般有两种登录方式而这两种登录方式读取根据文件读取的shell也不一样
+
+我们普通的登录时用密码就称为login,而使用Xwindows登录时第一次会输入密码再然后就不用输入密码了这种成为non-login
+
+login启动时会读取以下两个配置文件:
+
+- /etc/profile:这是系统整体的设置
+- ~/.bash_profile或~/.bash_login或~/.profile:属于用户个人设置
+
+#### bash环境配置文件
+
+https://blog.csdn.net/qq_36121238/article/details/103473054
+
+太多了。。。
+
+
+
+### 查看环境变量
+
+- 使用env命令
+
+  - >XDG_SESSION_ID=5449               <\=\=\=主机名
+    >HOSTNAME=YH                
+    >TERM=xterm                <\=\=\=使用的终端环境类型
+    >SHELL=/bin/bash                 <\=\=\=使用的bash类型
+    >HISTSIZE=3000                        <\=\=\=记录的命令个数
+    >SSH_CLIENT=144.12.230.5 48025 22
+    >OLDPWD=/usr/local/YH                <\=\=\=上一个工作目录
+    >SSH_TTY=/dev/pts/6
+    >USER=root                          <\=\=\=使用者名称
+    >LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=01;05;37;41:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.axv=01;35:*.anx=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=01;36:*.au=01;36:*.flac=01;36:*.mid=01;36:*.midi=01;36:*.mka=01;36:*.mp3=01;36:*.mpc=01;36:*.ogg=01;36:*.ra=01;36:*.wav=01;36:*.axa=01;36:*.oga=01;36:*.spx=01;36:*.xspf=01;36:
+    >MAIL=/var/spool/mail/root                        <\=\=\=mailbox的位置 
+    >PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+    >PWD=/usr/local
+    >LANG=en_US.utf8                <\=\=\=语言                             
+    >SHLVL=1
+    >HOME=/root                   <\=\=\=用户目录  
+    >LOGNAME=root
+    >SSH_CONNECTION=144.12.230.5 48025 172.17.0.5 22
+    >LESSOPEN=||/usr/bin/lesspipe.sh %s
+    >PROMPT_COMMAND=history -a; history -a; printf "\033]0;%s@%s:%s\007" "${USER}" "${HOSTNAME%%.*}" "${PWD/#$HOME/~}"
+    >XDG_RUNTIME_DIR=/run/user/0
+    >HISTTIMEFORMAT=%F %T 
+    >_=/usr/bin/env
+
+- 使用set观察(包含环境变量与自定义变量)
+  - 其中PS1这个变量用于改变[11:08:32 root@YH YH]# 
+  - 很多就不细讲了
+- $?上一个命令的返回值一般正常返回0
+- $$查看bash的pid
+- OSTYPE、HOSTTYPE、MACHTYPE
+- export将自定义变量转换为环境变量，子进程可以使用父进程的环境变量但是无法使用自定义变量
+  - export [变量名称]如果不写变量名称会把所有环境变量都列出来
+- 使用locale可以显示出所有支持的语系
+
+
+
+### 设置变量
+
+- 使用read可以交互式设置变量
+
+  - read [-p提示字符t等待秒数] variable将数据读取到variable变量中
+
+- declare,typeset:声明变量类型,如果declare后面没有任何参数直接显示出所有的变量名与内容与set差不多,
+
+  - declare [-a数组-i整形-x与export一样-r设为readonly]
+> 设置永久变量https://blog.csdn.net/u010794523/article/details/38622275/
+
+
+
+
+### 使用ulimit
+
+由于Linux可以多个用户同时登录使用所有要为每个用户设置资源占比
+
+- ulimit
+
+  - -a 　显示目前资源限制的设定。
+  - -c <core文件上限> 　设定core文件的最大值，单位为区块。
+  - -d <数据节区大小> 　程序数据节区的最大值，单位为KB。
+  - -f <文件大小> 　shell所能建立的最大文件，单位为区块。
+  - -H 　设定资源的硬性限制，也就是管理员所设下的限制。
+  - -m <内存大小> 　指定可使用内存的上限，单位为KB。
+  - -n <文件数目> 　指定同一时间最多可开启的文件数。
+  - -p <缓冲区大小> 　指定管道缓冲区的大小，单位512字节。
+  - -s <堆叠大小> 　指定堆叠的上限，单位为KB。
+  - -S 　设定资源的弹性限制。(警告)
+  - -t <CPU时间> 　指定CPU使用时间的上限，单位为秒。
+  - -u <程序数目> 　用户最多可开启的程序数目。
+  - -v <虚拟内存大小> 　指定可使用的虚拟内存上限，单位为KB。
+
+
+### 删除变量中的内容
+
+#从前面删除[最小匹配]  ${变量#关键字}
+
+##从前面删除[最大匹配]  ${变量##关键字}
+
+%从后面删除[最小匹配]  ${变量%关键字}
+
+%%从后面删除[最大匹配]  ${变量%%关键字}
+
+/替换符合字符串的第一个内容  ${变量/旧字符串/新字符串}
+
+//替换符合字符串的所有字符串  ${变量//旧字符串/新字符串}
+
+
+
+### 别名
+
+alise 
+
+命名规则与变量命名规则几乎一样
+
+alise 别名='命令 选项'
+
+### history
+
+查看历史命令的命令
+
+- n:最近n条命令
+- -c:清除目前的shell中所有history内容
+- -a:将目前新增的history写入到histfiles中默认写入~/.bash_history
+- -r:将目前的history记录内容读到shell的histfiles中
+- -w:将目前history内容写入histfiles中
+
+使用!命令
+
+- !!执行上一条命令
+- !n执行第n条命令
+- !vi执行近来vi开头的命令
+
+### 命令执行顺序
+
+- 包含绝对或者相对路径的命令
+- 由alias命令执行
+- 由bash内置的命令执行
+- 通过$PATH变量来找到第一个命令执行
+
+
+
+#### bash的欢迎信息
+
+/etc/issue
+
+/etc/motd
+
+
 
 
 
@@ -1576,6 +1789,9 @@ firewall-cmd --list-ports查看开启
   - /locale.conf:可以修改系统语言
   - /opt（必要）:这个目录在防止第三方辅助软件/opt的相关配置文件
   - /filesystems:系统指定的测试挂载文件系统类型的优先级
+  - /shells:显示可以使用的shell
+  - /profile.d
+    - /*.sh:这里面所有的用户r权限的文件都会被/etc/profile调用,包含了操作界面的颜色、语系、别名等
   - /sysconfig
     - /network-scripts:网络配置目录
 - /media: 存放**可删除的设备**
