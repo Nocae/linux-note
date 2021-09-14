@@ -1513,6 +1513,42 @@ https://blog.csdn.net/qq_36121238/article/details/103473054
 
 
 
+#### 终端的环境设置
+
+- stty(set tty)
+
+  - 查看所有特殊字体 ^代表[CTRL]
+
+  - >speed 38400 baud; rows 31; columns 120; line = 0;
+    >intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>; eol2 = <undef>; swtch = <undef>; start = ^Q;
+    >stop = ^S; susp = ^Z; rprnt = ^R; werase = ^W; lnext = ^V; flush = ^O; min = 1; time = 0;
+    >-parenb -parodd -cmspar cs8 -hupcl -cstopb cread -clocal -crtscts
+    >-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr icrnl ixon -ixoff -iuclc -ixany -imaxbel -iutf8
+    >opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+    >isig icanon iexten echo echoe echok -echonl -noflsh -xcase -tostop -echoprt echoctl echoke
+    >
+    >intr:发送中断的信号给目前正在run的程序
+    >
+    >quit:发送一个quit给正在run的程序
+    >
+    >erase:向后删除字符
+    >
+    >kill:删除在目前命令行上的所有文字
+    >
+    >eof:end of file 代表[输入结束]
+    >
+    >start:在某个程序停止后重新启动他的output
+    >
+    >stop:停止目前屏幕的输出
+    >
+    >susp:送一个terminal stop 的信号给正在运行的程序
+
+- set(可以设置以下额外的终端环境但是书上不建议修改)
+
+  - https://www.runoob.com/linux/linux-comm-set.html
+
+
+
 ### 查看环境变量
 
 - 使用env命令
@@ -1644,6 +1680,241 @@ alise 别名='命令 选项'
 /etc/motd
 
 
+
+## 通配符与特殊符号
+
+| 符号  | 意义                                                |
+| ----- | --------------------------------------------------- |
+| *     | 任意多个字符                                        |
+| ?     | 任意一个字符                                        |
+| [abc] | abc中的一个                                         |
+| [-]   | 如果[]中有-代表从哪到哪例如[1-9]标识从1-9中任意一个 |
+| [^]   | 不含有的意思例如[\^abc]里面只要没有abc就满足        |
+
+
+
+特殊符号
+
+| #     | 注释                                            |
+| ----- | ----------------------------------------------- |
+| \     | 转义符                                          |
+| \|    | 管道                                            |
+| ;     | 连续命令执行分隔符                              |
+| ~     | 家                                              |
+| $     | 变量前导符                                      |
+| &     | 任务管理:将命令变成后台任务                     |
+| !     | not的意思                                       |
+| /     | 目录符号                                        |
+| >，>> | 输出流重定向分别时替换和累加                    |
+| <,<<  | 输入流重定向                                    |
+| ''    | 不具有变量替换功能                              |
+| ""    | 具有变量替换功能                                |
+| ``    | 可以执行的命令或使用$()例如在""想要执行命令"``" |
+| ()    | 为子shell的开始与结束                           |
+| {}    | 命令区块的组合                                  |
+
+
+
+## 数据流重定向
+
+- \>:标准输出流到指定位置并进行覆盖
+- \>\>:标准输出流到指定位置并进行叠加
+- <:标准输入流,将命令所需的字符串通过流进行输入
+- <<:标准输入流,将命令所需的字符串通过键盘输入并设置结束标志
+- 2\>:标准错误流到指定位置并进行覆盖
+- 2\>\>:标准错误流到指定位置并进行叠加
+
+> 如果错误流和正确流都要写入一个文件可以使用2>&1 或者 &>
+>
+> [root@YH YH]# find /home -name .bashrc &> $WORK/error
+> [root@YH YH]# cat error
+> /home/stranger/.bashrc
+> [root@YH YH]# find /home -name .bashrc > $WORK/error 2>&1
+> [root@YH YH]# cat error
+> /home/stranger/.bashrc
+> [root@YH YH]# find /home -name .bashc > $WORK/error 2>&1
+> [root@YH YH]# cat error
+> [root@YH YH]# find /home -name .b* > $WORK/error 2>&1
+> [root@YH YH]# cat error
+> /home/stranger/.bashrc
+> /home/stranger/.bash_logout
+> /home/stranger/.bash_profile
+> [root@YH YH]# find /home -nam .b* > $WORK/error 2>&1
+> [root@YH YH]# cat error
+> find: unknown predicate `-nam'
+
+
+
+### 多命令运行
+
+- ; :使用这个符号可以让命令按照循序执行
+
+  - > 例如在关机前进行同步
+    >
+    > sync;shutdown
+
+- && :前面的命令执行成功后才会执行后面的命令
+
+  - > ls /home/aaa && mkdir /home/aaa/bbb
+    >
+    > 如果存在 /home/aaa则建立文件夹否则不建立
+
+- || :如果前面的命令执行成功则不执行后面的
+
+  - > ls /home/aaa || mkdir /home/aaa
+    >
+    > 如果目录不存在则新建一个目录
+
+注意这里||的优先级和&&一样
+
+
+
+### 管道
+
+用来处理标准输出流的信息例如:
+
+>[root@YH YH]# ls | more
+>1.txt
+>1.txt.gz
+>cat
+>error
+>etc.tar.bz2
+>etc.tar.gz
+>etc.tar.xz
+>h
+>Java语言程序设计.进阶篇.原书第10版.pdf
+>services.[gz
+>test.img
+>vitest
+
+==管道命令必须能够接受来自前一个命令的数据成为标准输入继续处理才行==
+
+例如2>&1可以使用管道来修改达到同样的操作
+
+
+
+#### 与管道配合使用的命令
+
+- cut:将输入流中的数据进行分割
+
+  - -d '分隔符':按照字符进行分割常常与-f使用
+
+  - -f :取出分割的第n个片段
+
+  - >[root@YH YH]# echo $PATH | cut -d ':' -f 1,3
+    >
+    >取出第一个和第三个
+    >
+    >/usr/local/sbin:/usr/sbin
+    >[root@YH YH]# echo $PATH
+    >/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+
+  - -c取出固定字符区间的所有字符
+
+  - >[root@YH YH]# export
+    >declare -x HISTSIZE="3000"
+    >declare -x HISTTIMEFORMAT="%F %T "
+    >declare -x HOME="/root"
+    >declare -x HOSTNAME="YH"
+    >declare -x LANG="en_US.utf8"
+    >declare -x LESSOPEN="||/usr/bin/lesspipe.sh %s"
+    >declare -x LOGNAME="root"
+    >
+    >使用前
+    >
+    >[root@YH YH]# export | cut -c 12-
+    >HISTSIZE="3000"
+    >HISTTIMEFORMAT="%F %T "
+    >HOME="/root"
+    >HOSTNAME="YH"
+    >LANG="en_US.utf8"
+    >LESSOPEN="||/usr/bin/lesspipe.sh %s"
+    >LOGNAME="root"
+    >
+    >使用后
+
+- grep分析并找出需要的数据
+
+  - 还可以使用正则表达式进行查找,不过命令太多了
+
+  - >[root@YH YH]# ls | grep '.'
+    >1.txt
+    >1.txt.gz
+    >cat
+    >error
+    >etc.tar.bz2
+    >etc.tar.gz
+    >etc.tar.xz
+    >h
+    >Java语言程序设计.进阶篇.原书第10版.pdf
+    >services.[gz
+    >test.img
+    >vitest
+    >[root@YH YH]# ls | grep 'h'
+    >h
+
+- sort:排序
+
+  - -f:忽略大小写
+  - -b:忽略最前面空格
+  - -M:月份名称排序
+  - -n:使用纯数字进行排序
+  - -r:反向排序
+  - -u:uniq相同的数据中,仅出线一行代表
+  - -t:分隔符号,使用Tab来分割
+  - -k:以哪个区间进行排序
+
+- uniq:去重
+
+  - -i:忽略大小写
+  - -c:进行计数
+
+- wc:统计字符
+
+  - -l 多少行
+  - -w 多少字母
+  - -m 多少字符
+
+- tee:可以将输出的数据流一份给文件一份
+
+- tr [-ds] set1 set2:进行替换或者删除字符
+
+  - -d 删除set1字符
+
+  - -s 替换掉重复的字符
+
+  - > last | tr '[a-z]' '[A-Z]'
+
+- join:两个文件中传递数据
+
+  - -t:设置分隔符默认时空格
+
+  - -i:忽略大小写
+
+  - > join -t ':' /etc/passwd /etc/shadow
+    >root:x:0:0:root:/root:/bin/bash:$1$ZsTljEDo$JK/OTgZctSUcDODqjDrg.0:18880:0:99999:7:::
+    >bin:x:1:1:bin:/bin:/sbin/nologin:*:17834:0:99999:7:::
+    >daemon:x:2:2:daemon:/sbin:/sbin/nologin:*:17834:0:99999:7:::
+    >adm:x:3:4:adm:/var/adm:/sbin/nologin:*:17834:0:99999:7:::
+
+  - 建议在连接两个文件之前先排序
+
+- paste:和join差不多
+
+- expand:将tab转换为空格
+
+- split:将大文件进行划分
+
+  - -l 按行划分
+  - -b 按大小划分
+
+- xargs:https://www.runoob.com/linux/linux-comm-xargs.html
+
+  - emmmmmm,呃呃呃呃呃呃呃呃呃呃呃呃呃呃,啊啊啊啊啊啊啊啊啊啊啊
+
+- 关于-:
+
+  - 当我们使用了一个必须添加文件名的命令可以使用-来进行代替
 
 
 
