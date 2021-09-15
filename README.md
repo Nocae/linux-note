@@ -1435,14 +1435,14 @@ vim可以使用 vim [file1] [file2]进行同时编辑
 
 ### 多窗口编辑
 
-| 命令                 | 结果                                                       |
-| -------------------- | ---------------------------------------------------------- |
-| :sp [filename]       | 添加一个窗口不加filename就是创建两个窗口但是同一文件       |
-| ctrl+w+↑或者ctrl+w+↓ | 进行窗口的切换                                             |
-| ctrl+x               | 下方弹出所有的可补全提示常用的有ctrl+o以文件扩展名方式补充 |
-| :set nu              | 设置与取消行号,nonu取消行号                                |
-| :set autoindent      | 设置是否自动缩进,noautoindent不缩进                        |
-| :set all             | 显示目前所有的环境参数设置值                               |
+| 命令            | 结果                                                       |
+| --------------- | ---------------------------------------------------------- |
+| :sp [filename]  | 添加一个窗口不加filename就是创建两个窗口但是同一文件       |
+| ctrl+w          | 进行窗口的切换                                             |
+| ctrl+x          | 下方弹出所有的可补全提示常用的有ctrl+o以文件扩展名方式补充 |
+| :set nu         | 设置与取消行号,nonu取消行号                                |
+| :set autoindent | 设置是否自动缩进,noautoindent不缩进                        |
+| :set all        | 显示目前所有的环境参数设置值                               |
 
 ![img](https://img2018.cnblogs.com/blog/1442837/201811/1442837-20181121151226556-202455126.png)
 
@@ -1795,7 +1795,7 @@ alise 别名='命令 选项'
 
 注意这里||的优先级和&&一样
 
-
+或者使用test命令来实现上面的功能
 
 ### 管道
 
@@ -1863,6 +1863,26 @@ alise 别名='命令 选项'
 
 - grep分析并找出需要的数据
 
+  - -A :找出匹配的行之后的n行
+
+  - -B :找出匹配的行之间的n行
+
+  - -v :将不包含的行列出来
+
+  - -n :显示行号
+
+  - -i :忽略大小写
+
+  - >[root@YH ~]# dmesg | grep -n --color=auto '0x80000000-0xfeffbfff'
+    >100:[    0.000000] e820: [mem 0x80000000-0xfeffbfff] available for PCI devices
+    >[root@YH ~]# dmesg | grep -n -A3 -B2 --color=auto '0x80000000-0xfeffbfff'
+    >98-[    0.000000] PM: Registered nosave memory: [mem 0x000a0000-0x000effff]
+    >99-[    0.000000] PM: Registered nosave memory: [mem 0x000f0000-0x000fffff]
+    >100:[    0.000000] e820: [mem 0x80000000-0xfeffbfff] available for PCI devices
+    >101-[    0.000000] Booting paravirtualized kernel on KVM
+    >102-[    0.000000] setup_percpu: NR_CPUS:5120 nr_cpumask_bits:1 nr_cpu_ids:1 nr_node_ids:1
+    >103-[    0.000000] percpu: Embedded 38 pages/cpu s118784 r8192 d28672 u2097152
+    
   - 还可以使用正则表达式进行查找,不过命令太多了
 
   - >[root@YH YH]# ls | grep '.'
@@ -1943,6 +1963,385 @@ alise 别名='命令 选项'
 - 关于-:
 
   - 当我们使用了一个必须添加文件名的命令可以使用-来进行代替
+
+
+
+## 正则与格式化处理文件
+
+正则分为:基础正则表达式与扩展表达式
+
+查找方式是or而不是and
+
+对字符串排序影响语系意义的则会对正则结果有影响
+
+>举个例子
+>
+>LANG＝C的英文编码顺序为01234....ABCD...abcd
+>
+>但是下面的编码顺序为
+>
+>LANG=zh_CH时编码顺序为:01234...aAbBcCdDeE
+>
+>如果使用[A-B]第一个语系会正确的选取到AB两个字母但是下面则会额外的选取到b这个字符
+
+这里演示一般使用grep命令
+
+
+
+由于语系有问题所以可能会用到一些符号
+
+| 特殊符号   | 代表意义                                    |
+| ---------- | ------------------------------------------- |
+| [:alnum:]  | 所有英文字母以及数字                        |
+| [:alpha:]  | 任何大小写字母                              |
+| [:blank:]  | 空格或tab                                   |
+| [:cntrl:]  | 控制按键                                    |
+| [:digit:]  | 数字                                        |
+| [:graph:]  | 除了空格与tab所有按键                       |
+| [:lower:]  | 小写字母                                    |
+| [:print:]  | 可以被打印出来的字母                        |
+| [:punct:]  | 标点符号                                    |
+| [:upper:]  | 大写字母                                    |
+| [:space:]  | 会产生空格的字符                            |
+| [:xdigit:] | 十六进制的数字类型、因此包含0~9、A~F、a~f等 |
+
+- [] :括号内的字符任意一个都可以进行匹配
+
+- \- :代表连续的字符
+
+  - 例如查找a到z包含的字符串
+
+  - > grep -n '[a-z]' re.txt
+
+- ^ :如果被包含在中括号内则代表不包含的意思否则代表以后面那个字符开头的意思
+
+  - >[root@YH YH]# grep -n '^[\^a-zA-Z]' regular_express.txt 
+    >1:"Open Source" is a good mechanism to develop programs.
+    >21:# I am VBird
+
+    代表不以英文字母开头
+  
+- $ :代表以前面那个字符结尾
+
+  - 如果想要找出空行可以使用
+
+  - > ^&例如
+    >
+    > [root@YH YH]# grep -n '^$' regular_express.txt 
+    > 22:
+
+- . :匹配任意一个字符
+
+- \* :重复前一个字符0~无穷次
+
+- \+ :重复前一个字符1~无穷次,必须使用-e 或egrep
+
+- ? :重复前一个字符0~1次,必须使用-e 或egrep
+
+- | :或者 ,必须使用-e 或egrep
+
+- ():群组没太看懂,必须使用-e 或egrep
+
+- ()+:多重复群组判别,必须使用-e 或egrep
+
+- {}:包含前一个字符的特定个数例如(注意因为{}都是bash的特殊字符所以要转义)
+
+  - >'o\\{2\\}'
+    >
+    >找出连续的两个o
+    >
+    >[root@YH YH]# grep -n 'o\{2\}' regular_express.txt 
+    >1:"Open Source" is a good mechanism to develop programs.
+    >2:apple is my favorite food.
+    >3:Football game is not use feet only.
+    >9:Oh! The soup taste good.
+    >18:google is the best tools for search keyword.
+    >19:goooooogle yes!
+    >[root@YH YH]# grep -n 'o\{4\}' regular_express.txt 
+    >19:goooooogle yes!
+
+找出所有不是空行且非注释的内容
+
+>grep '^[\^#]' /etc/rsyslog.conf --color=auto > /usr/local/YH/2.txt 
+>
+>grep -v '^$' /etc/rsyslog.conf | grep -v '^#' --color=auto  > /usr/local/YH/1.txt
+>
+>上面两个语句结果一致(第一个我写的第二个书上写的)
+>
+>可以使用多窗口来同时比对结果
+
+- printf:格式化输出
+
+  - >https://www.linuxprobe.com/linux-printf-example.html
+
+    ```
+    [root@localhost ~]# printf "姓名：%s\n身高：%dcm\n体重：%dkg\n" "小明" "180" "75"
+    姓名：小明
+    身高：180cm
+    体重：75kg
+    ```
+
+- sed: sed [-nerf] [操作]
+
+  - -n :使用安静模式,只有讲过特殊处理的行或操作才列出来
+
+  - -e :直接在命令行上进行sed操作编辑
+
+  - -f :直接将sed操作写在一个文件内 -f filename 
+
+  - -r :sed的操作使用的是扩展型正则
+
+  - -i :直接修改读取的文件内容
+
+  - 操作说明:[n1[,n2]] function $代表最后一行
+
+    - a 新增
+
+    - >[root@YH YH]# nl /etc/passwd | sed  '3a sadfasdfas\     
+      >\> asdasfasd'
+      > 1	root:x:0:0:root:/root:/bin/bash
+      > 2	bin:x:1:1:bin:/bin:/sbin/nologin
+      > 3	daemon:x:2:2:daemon:/sbin:/sbin/nologin
+      > sadfasdfas
+      > asdasfasd
+      
+    - c 替换
+
+    - >nl /etc/passwd | sed  '2,20c aaaaa'
+      >     1	root:x:0:0:root:/root:/bin/bash
+      >aaaaa
+      >    21	sshd:x:74:74:Privilege-separated SSH:/var/empty/sshd:/sbin/nologin
+      >    22	postfix:x:89:89::/var/spool/postfix:/sbin/nologin
+
+    - d 删除
+
+    - i 插入
+
+    - > [root@YH YH]# nl /etc/passwd | sed  '3i sadfasdfas\
+      > \> adfasdfasdf'
+      >  1	root:x:0:0:root:/root:/bin/bash
+      >  2	bin:x:1:1:bin:/bin:/sbin/nologin
+      >  sadfasdfas
+      >  adfasdfasdf
+
+    - p 打印
+
+    - >显示2-5行
+      >
+      >[root@YH YH]# nl /etc/passwd | sed -n '2,5p'
+      >     2	bin:x:1:1:bin:/bin:/sbin/nologin
+      >     3	daemon:x:2:2:daemon:/sbin:/sbin/nologin
+      >     4	adm:x:3:4:adm:/var/adm:/sbin/nologin
+      >     5	lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+
+    - s 替换
+
+    - >'s/要替换的字符/新的字符/g'
+      >
+      >[root@YH ~]# last
+      >root     pts/3        153.118.34.219   Wed Sep 15 11:39   still logged in   
+      >root     pts/2        153.118.34.219   Wed Sep 15 10:51   still logged in   
+      >root     pts/0        153.118.34.219   Wed Sep 15 10:47   still logged in   
+      >root     pts/2        153.118.34.219   Wed Sep 15 10:47 - 10:47  (00:00)    
+      >root     pts/0        153.118.34.219   Wed Sep 15 10:19 - 10:47  (00:27)    
+      >
+      >替换前
+
+      >[root@YH ~]# last | sed 's/  *.*$//g'
+      >root
+      >root
+      >root
+      >root
+      >root
+      >root
+      >
+      >替换后
+
+    - 使用\来换行
+
+    - >[root@YH YH]# nl /etc/passwd | sed '3,$d'
+      >     1	root:x:0:0:root:/root:/bin/bash
+      >     2	bin:x:1:1:bin:/bin:/sbin/nologin
+
+    ==可以之间使用sed来修改文件,但是正则容易出现逻辑错误不建议直接修改文件==
+
+- awk:数据处理工具
+
+  - 适合小型的文本数据
+
+  - >[root@YH ~]# last -n 5
+    >root     pts/1        153.118.80.111   Wed Sep 15 12:20   still logged in   
+    >root     pts/3        153.118.34.219   Wed Sep 15 11:39   still logged in   
+    >root     pts/2        153.118.34.219   Wed Sep 15 10:51   still logged in   
+    >root     pts/0        153.118.34.219   Wed Sep 15 10:47   still logged in   
+    >root     pts/2        153.118.34.219   Wed Sep 15 10:47 - 10:47  (00:00)    
+    >
+    >wtmp begins Fri Sep 10 09:47:22 2021
+    >[root@YH ~]# last -n 5 | awk '{print $1 "\t" $3}'
+    >root	153.118.80.111
+    >root	153.118.34.219
+    >root	153.118.34.219
+    >root	153.118.34.219
+    >root	153.118.34.219
+    >
+    >这在里面可以使用 变量$1 这种
+    >
+    >也可以使用全局变量
+    >
+    >NR目前awk所处理的是第行数据
+    >
+    >FS 目前的分割字符
+    >
+    >NF 每一行拥有的字段总数
+    >
+    >[root@YH ~]# last -n 5 | awk '{print $1 "\t lines:" NR "\t columns:" NF "\t" $3}'
+    >root	 lines:1	 columns:10	153.118.80.111
+    >root	 lines:2	 columns:10	153.118.34.219
+    >root	 lines:3	 columns:10	153.118.34.219
+    >root	 lines:4	 columns:10	153.118.34.219
+    >root	 lines:5	 columns:10	153.118.34.219
+    >	 lines:6	 columns:0	
+    >wtmp	 lines:7	 columns:7	Fri
+
+    还有很多用法
+
+    > https://www.linuxprobe.com/linux-awk-clever.html
+
+- diff:查看两个问价你的差异
+
+  - >[root@YH YH]# diff 1.txt 2.txt 
+    >[root@YH YH]# vim 2.txt 
+    >[root@YH YH]# diff 1.txt 2.txt 
+    >14a15
+    >
+    >\> i
+    >
+    >通过vim在最后一行新加一个文件14a15应该是在14行后面新加了15行增加内容为i
+  
+- cmp:字节比对
+
+- patch:这个和diff结合有点像git了
+
+  - 首先使用diff来创建补丁文件
+
+  - >[root@YH YH]# diff passwd.old passwd.new>passwd.patch
+    >[root@YH YH]# diff -Naur passwd.old passwd.new>passwd.patch
+    >[root@YH YH]# cat passwd.patch 
+    >--- passwd.old	2021-09-15 14:09:27.393427041 +0800
+    >+++ passwd.new	2021-09-15 14:08:20.921977408 +0800
+    >@@ -1,9 +1,8 @@
+    > root:x:0:0:root:/root:/bin/bash
+    > bin:x:1:1:bin:/bin:/sbin/nologin
+    >-daemon:x:2:2:daemon:/sbin:/sbin/nologin
+    > adm:x:3:4:adm:/var/adm:/sbin/nologin
+    > lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+    >-sync:x:5:0:sync:/sbin:/bin/sync
+    >+asdfasdf
+    > shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown
+    > halt:x:7:0:halt:/sbin:/sbin/halt
+    > mail:x:8:12:mail:/var/spool/mail:/sbin/nologin
+
+  - 使用补丁文件进行更新
+
+    >[root@YH YH]# patch -p0 < passwd.patch
+    >patching file passwd.old
+    >[root@YH YH]# cat passwd.old
+    >root:x:0:0:root:/root:/bin/bash
+    >bin:x:1:1:bin:/bin:/sbin/nologin
+    >adm:x:3:4:adm:/var/adm:/sbin/nologin
+    >lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+    >asdfasdf
+
+  - 使用补丁文件进行复原
+
+    >[root@YH YH]# patch -R -p0 < passwd.patch
+    >patching file passwd.old
+    >
+    >[root@YH YH]# head -n 5 passwd.old
+    >root:x:0:0:root:/root:/bin/bash
+    >bin:x:1:1:bin:/bin:/sbin/nologin
+    >daemon:x:2:2:daemon:/sbin:/sbin/nologin
+    >adm:x:3:4:adm:/var/adm:/sbin/nologin
+    >lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+
+### 区别是否可用正则
+
+或许使用''的使用可以使用正则例如grep
+
+不适用''不能用正则 ls(在bash下\*代表任意多个字符 例如ls v\*)
+
+
+
+## shell
+
+编写第一个bash脚本
+
+>[root@YH YH]# vim hello.sh
+>[root@YH YH]# cat hello.sh 
+>#!/bin/bash
+>echo "Hello World !"
+>exit 0
+
+第一行是用来声明这是一个shell脚本但是#为注释,exit 0是代表程序的返回值
+
+>[root@YH YH]# sh hello.sh 
+>Hello World !
+
+执行脚本
+
+>[root@YH YH]# vim hello.sh 
+>[root@YH YH]# cat hello.sh 
+>#!/bin/bash
+>echo "Hello World !"
+>read -p "请输入名字" firstname
+>echo -e "\nYour Name ${firstname}"
+>exit 0
+>[root@YH YH]# sh hello.sh 
+>Hello World !
+>请输入名字YH
+>
+>Your Name YH
+
+简单的交互式
+
+
+
+关于计算
+
+可以使用declare来建立数据类型的变量
+
+$((计算式))在shell中使用这种来进行运算或使用bc来进行运算
+
+>[root@YH ~]# echo "1\*2"|bc
+>2
+>[root@YH ~]# echo "2\*2"|bc
+>4
+
+
+
+### 脚本的执行方式
+
+- 直接执行系统会给脚本再创建一个进程来执行也就是创建一个子进程所以在子进程创建的变量都会在程序结束后无效
+- 使用source来执行脚本
+
+test 用来检测文件,太多了...都是关于参数
+
+利用[]进行判断(判断符号)
+
+[ -z "${HOME}" ]中括号中间的两端必须有空格
+
+- 在中括号[]内的每个组件都需要有空格来分隔;
+- 中括号内的变量要用双引号引起来
+- 中括号内的常数也要用双引号或单引号引起来
+
+
+
+使用sh来调试
+
+- sh [-nvx] *.sh
+  - -n :检查语法
+  - -v :执行之前,先将脚本内容输出到屏幕上
+  - -x :将脚本内容输出到屏幕上
 
 
 
@@ -2125,3 +2524,5 @@ firewall-cmd --list-ports查看开启
 - /proc:(本身是虚拟文件系统，数据都放置在内存中。系统的信息例如内核、进程信息、外接设备、网络状况，他放置的数据都在内存中)
   - filesystems:Linux已经加载的文件系统类型
 - /sys:不占硬盘容量也是保存系统信息的.
+
+[^#]: 
