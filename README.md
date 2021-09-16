@@ -528,6 +528,86 @@ umask 设置默认减掉的权限例如umask 777则变成新建文件什么权�
 
 
 
+### ACL特殊用户权限
+
+可以针对单一用户、单一文件或目录进行r、w、x权限设置
+
+查看是否能够使用acl
+
+> dmesg | grep -i acl
+>
+> [root@YH ~]# dmesg | grep -i acl
+> [    1.411790] systemd[1]: systemd 219 running in system mode. (+PAM +AUDIT +SELINUX +IMA -APPARMOR +SMACK +SYSVINIT +UTMP +LIBCRYPTSETUP +GCRYPT +GNUTLS +ACL +XZ +LZ4 -SECCOMP +BLKID +ELFUTILS +KMOD +IDN)
+> [ 3572.030938] SGI XFS with ACLs, security attributes, no debug enabled
+
+- getfacl filename:获取某个文件/目录的ACL设置选项
+
+  - 几乎和下面一样
+
+  - >[root@YH local]# getfacl myuser/
+    >\# file: myuser/
+    >\# owner: root
+    >\# group: mygroup1
+    >\# flags: -s-
+    >user::rwx
+    >user:user1:rwx
+    >group::rwx
+    >mask::rwx
+    >other::---
+  
+- setfacl 目标文件名:设置某个目录/文件的ACL规范
+
+  - 简单的 u:账号:权限
+
+    - u:特定账户
+
+    - g:特定用户组
+
+    - m:用户权限或者组权限必须在mask权限设置范围才有效,即最大允许的权限如果mask最大权限为r那么无论怎么设置权限最大都是r
+
+    - ```bash
+      [root@YH local]# setfacl -m m::r myuser/
+      [root@YH local]# getfacl myuser/
+      # file: myuser/
+      # owner: root
+      # group: mygroup1
+      # flags: -s-
+      user::rwx
+      user:user1:rwx			#effective:r--
+      group::rwx			#effective:r--
+      mask::r--
+      other::---
+      
+      [root@YH local]# su user1
+      [user1@YH local]$ cd myuser/
+      bash: cd: myuser/: Permission denied
+      
+      ```
+  
+      - u:[g|u]:用户:权限,设置默认权限
+  
+  - -m :设置后续的ACL参数给文件使用
+  
+  - -x :删除后续的ACL
+  
+  - -b :删除所有ACL
+  
+  - -k :删除默认ACL参数
+  
+  - -R :递归设置ACL
+  
+  - -d :设置默认ACL只对目录有效(新建数据时会引用此默认值)
+  
+  - >[root@YH local]# setfacl -m u:user1:rwx myuser
+    >
+    >[root@YH local]# ll | grep 'myuser'
+    >drwxrws---+  4 root mygroup1  4096 Sep 16 18:30 myuser[root@YH local]# ll | grep 'myuser'
+    >drwxrws---+  4 root mygroup1  4096 Sep 16 18:30 myuser
+  
+  > 删除账号权限不用加权限等级如setfacl -x u:myuser1
+  >
+  > 设置账号无权限权限不能为空可以用-代替如setfacl -x u:myuser1:-
+
 
 
 ### 文件类型以及扩展名
@@ -2634,6 +2714,62 @@ MD5_CRYPT_ENAB yes
 
 chfn、chsh属于SUID
 
+
+
+### su与su -的区别
+
+```bash
+[stranger@YH ~]$ su root
+Password: 
+[root@YH stranger]# env | grep 'stranger'
+USER=stranger
+PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/stranger/.local/bin:/home/stranger/bin
+MAIL=/var/spool/mail/stranger
+PWD=/home/stranger
+LOGNAME=stranger
+```
+
+看见没纵使切换用户很多变量仍然没有读取
+
+读取的变量方式设置为非登录shell的方式
+
+使用su -
+
+```bash
+[stranger@YH ~]$ su - root
+Password: 
+Last login: Thu Sep 16 19:27:17 CST 2021 on pts/3
+[root@YH ~]# env | grep root
+USER=root
+MAIL=/var/spool/mail/root
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+PWD=/root
+HOME=/root
+LOGNAME=root
+```
+
+看到了吗变量变过来了
+
+-c 用root运行一个命令
+
+
+
+#### sudo
+
+只有/etc/sudoers内的用户才能执行==要用visudo来去修改这个目录==
+
+若用户执行sudo后便让用户输入自己的密码来确认
+
+密码输入成功才进行sudo后接命令
+
+若切换身份到相同用户不需要密码
+
+- -u [账户]:切换到账户并执行命令
+
+  
+
+
+
 ## 用户组管理
 
 - groupadd :新建组
@@ -2642,6 +2778,8 @@ chfn、chsh属于SUID
 - gpasswd groupname :用户组管理员功能
   - :无参是groupname密码
   - -A user:将管理权交给user
+
+
 
 
 
