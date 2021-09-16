@@ -1,4 +1,5 @@
-<<<<<<< HEAD
+
+
 
 
  # Linux
@@ -2341,7 +2342,258 @@ test 用来检测文件,太多了...都是关于参数
 - sh [-nvx] *.sh
   - -n :检查语法
   - -v :执行之前,先将脚本内容输出到屏幕上
-  - -x :将脚本内容输出到屏幕上
+  - -x :将脚本内容输出到屏幕上 
+
+
+
+## 用户管理
+
+### 用户标识UID与GID
+
+每个登录用户至少有两个ID一个是用户ID一个是UID
+
+Linux识别用户和组大部分都是靠ID识别
+
+用来记录UID与GID的/etc/passwd与/etc/shadow文件
+
+首先解析/etc/passwd
+
+```bash
+[root@YH ~]# nl /etc/passwd | sed '5,$d'
+1	root:x:0:0:root:/root:/bin/bash
+2	bin:x:1:1:bin:/bin:/sbin/nologin
+3	daemon:x:2:2:daemon:/sbin:/sbin/nologin
+4	adm:x:3:4:adm:/var/adm:/sbin/nologin
+```
+
+
+
+每一行都是以:分割
+
+第一栏:账户名
+
+第二栏:密码,由于放在这里不安全所以用x代替
+
+第三栏:UID
+
+| ID范围     | 该ID用户特性                                                 |
+| ---------- | ------------------------------------------------------------ |
+| 0          | 系统管理员                                                   |
+| 1~999      | 除了0以外其他ID都一样只不过这个范围一般作为保留账号<br />1~200有Linux发行版本自己建立的系统账号<br />201~999:若用户有系统账号需求时可以使用UID |
+| 1000~60000 | 一般用户                                                     |
+
+第四栏:GID
+
+第五栏:用来解释该账号用来干嘛的
+
+第六栏:家目录
+
+第七栏:登录后使用的shell 
+
+
+
+讲解/etc/shadow文件
+
+```bash
+[root@YH ~]# nl /etc/shadow
+     1	root:$1$ZsTljEDo$JK/OTgZctSUcDODqjDrg.0:18880:0:99999:7:::
+     2	bin:*:17834:0:99999:7:::
+     3	daemon:*:17834:0:99999:7:::
+```
+
+1. 账号名
+2. 密码
+3. 最近修改密码的日期
+4. 密码不可被修改的天数(与第三字段相比)防止一改再改
+5. 密码需要重新修改的天数(与第三字段相比)
+6. 密码需要修改期限前的警告天数(与第五字段相比):密码再过n天就过期了
+7. 密码过期后的账户宽限时间(与第五字段相比):可以使用账户权限可以登录但是过了这个时间就无法登录
+8. 账号失效日期和第三个字段一样都是从1970年依赖的总天数
+9. 保留
+
+查看shadow的加密机制
+
+```bash
+[root@YH ~]# authconfig --test | grep hashing
+ password hashing algorithm is md5
+```
+
+
+
+解析/etc/group
+
+```bash
+[root@YH ~]# head /etc/group
+root:x:0:
+bin:x:1:
+daemon:x:2:
+sys:x:3:
+adm:x:4:
+tty:x:5:
+disk:x:6:
+lp:x:7:
+mem:x:8:
+kmem:x:9:
+```
+
+1. 组名
+
+2. 用户组密码
+
+3. GID
+
+4. 此用户组支持的账户
+
+   - 由于该字段的特性所以可以设置一用户多组,下面介绍有效用户组
+
+   - > 在/etc/passwd里GID指代的时初始用户组而初始用户组并不会将该用户写入第四字段
+     >
+     > 而一登陆就立即获取初始用户组
+     >
+     > 如果要创建文件那么使用的是有效用户组
+     >
+     > 使用groups查看支持的所有用户组,但是第一个支持的组就是有效用户组
+     >
+     > 通常有效用户组的作用就是新建用户
+
+   - newgrp可以切换有效用户组但是使用了这个命令就进入了另一个shell环境
+
+关于/etc/gshadow解析
+
+```bash
+[root@YH Java]# cat /etc/gshadow
+root:::
+bin:::
+daemon:::
+sys:::
+adm:::
+tty:::
+disk:::
+lp:::
+mem:::
+kmem:::
+wheel:::
+cdrom:::
+mail:::postfix
+```
+
+1. 组名
+2. 密码:开头为!标识无合法密码,所以无用户组管理员
+3. 用户组管理员账号
+4. 加入该组的用户
+
+
+
+### 账户管理
+
+- useradd:添加一个用户(创建时至少参考/etc/default/useradd,/etc/login.defs,/etc/skel/*这三个文件)
+
+  - -u :输入一个uid
+
+  - -g :初始用户组
+
+  - -G :次要用户组
+
+  - -M :强制不要建立家(系统账号默认)
+
+  - -m :强制建立用户家(一般用户默认,默认权限700)
+
+  - -c :介绍说明
+
+  - -r :系统账户
+
+  - -s :失效日期
+
+  - -e :密码是否会失效
+
+  - -D :查看默认的创建参数
+
+    - ```bash
+      [root@YH etc]# useradd -D
+      GROUP=100   用户初始组id
+      HOME=/home  家的基准目录
+      INACTIVE=-1 密码是否会失效
+      EXPIRE=     账户失效日期
+      SHELL=/bin/bash 默认的shell
+      SKEL=/etc/skel  用户家目录参考基准目录(从这个目录的文件复制到家里面)
+      CREATE_MAIL_SPOOL=yes
+      
+      ```
+
+      
+
+如果添加用户但是没有使用passwd进行更改shadow中不会对密码进行加密(账户也会被锁定无法登录)
+
+```bash
+[root@YH etc]# cat shadow | grep test
+testuser:123456:18886:0:99999:7:::
+
+```
+
+centos有两种机制
+
+>私有用户组机制
+>
+>会创建一个与用户名一样的组因为用户有自己的组和家所以不会考虑GROUP=100这个参数
+>
+>公共用户机制
+>
+>以GROUP=100为值新建一个账号默认家目录的权限为drwxr-xr-x每个账户都属于用户组
+
+关于UID/GID的密码参数
+
+```bash
+[root@YH etc]# cat login.defs | grep -v '^$' | grep -v '^#'
+MAIL_DIR	/var/spool/mail			邮箱目录
+PASS_MAX_DAYS	99999				需要修改密码的日期
+PASS_MIN_DAYS	0					多久不可重新设置密码的日期
+PASS_MIN_LEN    8					密码最短的字符长度(以及弃用)
+PASS_WARN_AGE	7					过期警告提前日期
+UID_MIN                  1000		最小UID
+UID_MAX                 60000		最大UID
+SYS_UID_MIN               201		系统最小UID
+SYS_UID_MAX               999		系统最大UID
+GID_MIN                  1000		最小GID
+GID_MAX                 60000		最大GID
+SYS_GID_MIN               201		系统最小GID
+SYS_GID_MAX               999		系统最大GID
+CREATE_HOME	yes						是否创建家目录
+UMASK           077					默认权限(用最大权限删去这个就是默认权限)
+USERGROUPS_ENAB yes					使用userdel删除时是否删除初始用户组(如果没有人属组与这个组就将其删除)
+ENCRYPT_METHOD MD5					密码加密方式
+MD5_CRYPT_ENAB yes
+
+```
+
+#### passwd
+
+修改密码的简单方式
+
+>echo "12345" | passwd --stdin stranger
+
+但是 这样修改密码会留在历史记录里面
+
+让密码具有60天修改10天后失效
+
+> passwd -x 60 -i 10 stranger
+
+不让登录
+
+> passwd -l stranger
+>
+> passwd -u stranger (恢复正常)
+
+#### chage
+
+查看用户密码的详细参数
+
+#### usermod
+
+对用户属性进行调整https://www.runoob.com/linux/linux-comm-usermod.html
+
+#### userdel
+
+删除用户
 
 
 
