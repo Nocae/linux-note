@@ -2766,7 +2766,67 @@ LOGNAME=root
 
 - -u [账户]:切换到账户并执行命令
 
-  
+
+
+#### visudo
+
+```bash
+[root@YH etc]# cat sudoers | grep -v '^$' | grep -v '^#'
+Defaults   !visiblepw
+Defaults    always_set_home
+Defaults    match_group_by_gid
+Defaults    always_query_group_plugin
+Defaults    env_reset
+Defaults    env_keep =  "COLORS DISPLAY HOSTNAME HISTSIZE KDEDIR LS_COLORS"
+Defaults    env_keep += "MAIL PS1 PS2 QTDIR USERNAME LANG LC_ADDRESS LC_CTYPE"
+Defaults    env_keep += "LC_COLLATE LC_IDENTIFICATION LC_MEASUREMENT LC_MESSAGES"
+Defaults    env_keep += "LC_MONETARY LC_NAME LC_NUMERIC LC_PAPER LC_TELEPHONE"
+Defaults    env_keep += "LC_TIME LC_ALL LANGUAGE LINGUAS _XKB_CHARSET XAUTHORITY"
+Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin
+root	ALL=(ALL) 	ALL
+%wheel	ALL=(ALL)	ALL
+用户账户 登陆者的主机名 可切换身份 可执行的命令
+```
+
+- 单用户可使用root命令
+  - 直接修改
+
+- 利用wheel用户组以及免密的功能处理visudo
+
+  - 任何加入wheel这个组的用户可以随意使用sudo当然只要修改sudoers这个表加入其他组也可以实现wheel组的效果 %后面加组名
+  - 如果要免密就要在sudoers相关行的最后加入NOPASSWD:ALL
+
+- 有限制的命令操作
+
+  - >user	ALL=(ALL) 	/usr/bin/passwd   <\=\=这个路径必须是绝对路径
+    >
+    >user	ALL=(ALL) 	/usr/bin/passwd, !/usr/bin/passwd root   <\=\=这个路径必须是绝对路径
+
+- 通过别名创建
+
+  - sudoers
+
+  - >User Alias ADMPW = pro1,pro2,pro3,pro4
+    >
+    >Cmnd Alias ADMPWCOM = !/usr/bin/passwd, /usr/bin/passwd [A-Za-z]*, !/usr/bin/passwd root
+    >
+    >ADMPW ALL=(root) ADMPWCOM 
+    >
+    >//通过上面的写入将四个pro起别名并且权限也起别名进行统一管理
+
+  - 别名必须全大写
+
+- sudo的时间间隔
+
+  - 输入了一次密码五分钟之内无需再输入就可执行sudo操作
+
+- 输入自己的密码进入root
+
+  - >visudo
+    >
+    >User Alise ADMINS = pro1,pro2
+    >
+    >ADMINS ALL=(root) /bin/su -
 
 
 
@@ -2778,6 +2838,146 @@ LOGNAME=root
 - gpasswd groupname :用户组管理员功能
   - :无参是groupname密码
   - -A user:将管理权交给user
+
+
+
+### 特殊的shell,/sbin/nologin
+
+该shell无法登录并且如果存在/etc/nologin.txt登录后会显示文本内的内容
+
+```bash
+[root@YH etc]# useradd -s /sbin/nologin user4
+[root@YH etc]# su user4
+不让登录
+[root@YH etc]# cat nologin.txt 
+不让登录
+```
+
+
+
+### PAM 同一认证模块
+
+> PAM使用配置/etc/pam.d/下的文件，来管理对程序的认证方式.应用程序 调用相应的配置文件，从而调用本地的认证模块.模块放置在/lib/security下，以加载动态库的形式进，像我们使用su命令时，系统会提示你输入root用户的密码.这就是su命令通过调用PAM模块实现的。
+
+```bash
+[root@YH pam.d]# ls
+atd          fingerprint-auth     password-auth     remote          smartcard-auth-ac  sudo            systemd-user
+chfn         fingerprint-auth-ac  password-auth-ac  runuser         smtp               sudo-i          vlock
+chsh         login                polkit-1          runuser-l       smtp.postfix       su-l
+config-util  other                postlogin         setup           sshd               system-auth
+crond        passwd               postlogin-ac      smartcard-auth  su                 system-auth-ac
+[root@YH pam.d]# cat passwd
+#%PAM-1.0
+auth       include	system-auth
+account    include	system-auth
+password   substack	system-auth
+-password   optional	pam_gnome_keyring.so use_authtok
+password   substack	postlogin
+```
+
+- 一共有三个字段
+  - 第一个字段验证类别
+    - auth:主要用来检验用户的身份,这种类别通常是需要密码来验证
+    - account:验证用户是否具有权限
+    - session:这次登录期间的会话管理,记录用户的登录注销
+    - password:用于认证修订,例如修改密码
+    - 这四种一般是有顺序的
+  - 第二个字段控制标准
+    - required:不论成功还是结束都会执行后续,例如日志
+    - requisite:若验证失败则立刻返回源程序的failure标志,并种终止后续的验证流程
+    - sufficient:若成功则立刻返回success给源程序并终止后续的认证流程
+    - optional:大多数用于显示信息不用于认证
+    - include代表认证交给后面的文件作为这个类别的认证
+- PAM流程:
+  - 使用passwd进行介绍
+  - 用户开始执行PAM模块
+  - passwd调用PAM进行验证
+  - PAM到/etc/pam.d中找到与程序同名的配置文件
+  - 根据文件内的配置进行设置
+  - 验证结果返回
+  - passwd返回的结果进行下一步
+- PAM常用模块https://blog.csdn.net/weixin_34311757/article/details/92873089
+  - /etc/pam.d/*:每个程序的PAM配置文件
+  - /lib64/security/*:PAM模块文件的实际放置目录
+  - /etc/security/*:其他PAM环境的配置文件
+  - /usr/share/doc/pam-*/:详细的PAM说明文件
+  - limits.conf系统管理员可以使用这个账户统一管理,对于已经登录的用户无效
+  - /var/log/secure :记录模块发生的问题
+  - /var/log/messages:记录模块发生的问题
+
+
+
+## 有关用户
+
+### 查询
+
+- w
+- who
+- last
+- lastlog
+
+
+
+### 用户对谈
+
+- write
+
+  - root
+
+  - ```bash
+    [root@YH pam.d]# who
+    root     pts/0        2021-09-17 09:41 (153.118.189.29)
+    stranger pts/1        2021-09-17 10:48 (153.118.189.29)
+    [root@YH pam.d]# write stranger aaa
+    write: stranger is not logged in on aaa
+    [root@YH pam.d]# write stranger pts/2
+    write: stranger is not logged in on pts/2
+    [root@YH pam.d]# write stranger pts/1
+    hello
+    ai
+    
+    Message from stranger@YH on pts/1 at 10:50 ...
+    nixiangganma^[[D^[[D
+    
+    ```
+
+    
+
+  - stranger
+
+  - ```bash
+    [stranger@YH ~]$ 
+    Message from root@YH on pts/0 at 10:49 ...
+    hello
+    ^C
+    [stranger@YH ~]$ ai
+    
+    [stranger@YH ~]$ 
+    [stranger@YH ~]$ write root pst/0
+    write: root is not logged in on pst/0
+    [stranger@YH ~]$ who
+    root     pts/0        2021-09-17 09:41 (153.118.189.29)
+    stranger pts/1        2021-09-17 10:48 (153.118.189.29)
+    [stranger@YH ~]$ write root pts/0
+    nixiangganma^[[D^[[D
+    
+    ```
+
+  - 
+
+- mesg:使用mesg n可以不接受write的消息但是如果对方是root则强制手下
+
+- wall
+
+### 检查账号
+
+- pwck:用于检查/etc/passwd
+- pwconv:将/etc/passwd中的账号密码移动到/etc/shadow中
+- chpasswd:读入未加密的数据进行加密后写入/etc/shadow
+
+> 创建大量账号模板passwd --stdin
+>
+> 还需要一个shell脚本
 
 
 
@@ -2926,6 +3126,7 @@ firewall-cmd --list-ports查看开启
   - /opt（必要）:这个目录在防止第三方辅助软件/opt的相关配置文件
   - /filesystems:系统指定的测试挂载文件系统类型的优先级
   - /shells:显示可以使用的shell
+  - /pam.d:用来保存PAM的所有认证配置文件
   - /profile.d
     - /*.sh:这里面所有的用户r权限的文件都会被/etc/profile调用,包含了操作界面的颜色、语系、别名等
   - /sysconfig
