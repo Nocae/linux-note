@@ -1,7 +1,3 @@
-
-
-
-
  # Linux
 
 
@@ -2981,6 +2977,411 @@ password   substack	postlogin
 
 
 
+## 磁盘配额
+
+注意以下几点:
+
+- ext文件系统只能针对整个文件系统设置磁盘配额
+- xfs可以使用project能够针对目录进行配额
+- 内核必须支持磁盘配额(Centos7默认支持并开启)
+- Centos默认开启SELinux,由于SELinux的限制只能配置/home的额度
+- 不同的文件下系统有着不同的限额方式,限额之前必须知道文件系统
+- xfs可以针对下面的几部分进行配额:
+  - 分别对用户、用户组或个别目录进行配置
+  - 容量限制或文件数量限制
+  - 限制inode使用量:管理用户可以建立的[文件数量]
+  - 限制block使用量:管理磁盘容量
+  - 软硬限制(不是软连接和硬链接)
+    - hard:用户绝不能超过这个值,超过则会锁定用户的磁盘使用权
+    - soft:表示用户低于时可以正常使用如果超过这个值,系统会在用户登录时进行警告并给予宽限时间,如果用户在这段时间内没有把容量降低到soft以下则将hard的值降低到soft
+
+
+
+#### 配额测试
+
+进行操作时最好注销所有用户,并且不能有语法错误否则可能导致无法正常启动
+
+​	过去版本通常使用mount -o remount 进行重新挂载开启磁盘配额功能
+
+​	但是xfs似乎在挂载之初就声明了配额功能所有要修改/etc/fstab编辑该文件并在defaults后加入,usrquota,grpquota
+
+配额选项有以下三种:
+
+- uquota/usrquota/quota:针对账号
+- gquota/grpquota:针对组
+- pquota/prjquota:针对单一目录的设置,不可与grpquota同时存在
+
+磁盘配额命令quote
+
+- xfs_quote -x -c "命令" [挂载点]
+- -x:专家模式
+- -c:后面要接命令
+- 命令 
+  - print:打印信息
+  - df:与df一样
+  - report:列出目前的磁盘配额
+  - state:目前支持磁盘配额的文件系统信息
+
+
+
+## 软件磁盘阵列
+
+磁盘阵列就是将多个较小的磁盘组成一个较大的磁盘设备，使用RAID可以将这些设备视为一个整体，一共有五个模式
+
+- RAID 0(等量模式):性能最佳
+  - 将所有的数据进行分块写入不同的磁盘,这样读写速度快但是一旦有一块磁盘损害都可能造成数据的大量丢失
+- RAID 1(镜像模式):完全备份
+  - 同一份数据保存在两个磁盘上
+- RAID 1+0,RAID 0+1(推荐1+0,因为这样磁盘越多速度越快)
+  - 可以先将数据进行分块再将数据分别复制,并将原数据与复制数据一起写入,如下图:
+  - ![image-20210922093728257](C:\Users\lll\AppData\Roaming\Typora\typora-user-images\image-20210922093728257.png)
+- RAID 5:性能与数据备份的均衡考虑
+  - 需要三个以上的磁盘
+  - 采用RAID 0 的方式写入但是会进行奇偶校验将校验的结果放在不同盘,因此总体容量会少一块磁盘因为要放校验数据,如果一个磁盘损坏可以使用校验值来进行修复但是如果==两个或以上损坏则无法恢复==
+- RAID 6:和5一样的做法但是使用两个磁盘作为奇偶校验结果,因此保证两个磁盘数据恢复
+
+> 关于磁盘阵列的热备份(最好支持热插拔)
+>
+> 举个例子如果我安装了10快磁盘但是只用9块,某天系统发现其中一块损坏会将数据备份到那个没用到的磁盘上
+
+- 优点:数据的可靠性与速度,容量得到提升
+
+|                        | RAID 0      | RAID 1   | RAID 1 0       | RAID 5   | RAID 6   |
+| ---------------------- | ----------- | -------- | -------------- | -------- | -------- |
+| 最少磁盘数             | 2           | 2        | 4              | 3        | 4        |
+| 最大容错数量(数据恢复) | 无          | n-1      | n/2            | 1        | 2        |
+| 安全性                 | 无          | 最好     | 最好           | 好       | 好       |
+| 写入性能               | n           | 1        | n/2            | <n-1     | <n-2     |
+| 读出性能               | n           | n        | n              | <n-1     | <n-2     |
+| 可用容量               | n           | 1        | n/2            | n-1      | n-2      |
+| 应用                   | 速度,不备份 | 数据备份 | 服务器、云系统 | 数据备份 | 数据备份 |
+
+==磁盘阵列的设备名为/dev/sd[a-p]==
+
+软件磁盘阵列因为是系统模拟的所有名字为/dev/md[0-9]
+
+
+
+#### 使用mdadm 进行软件磁盘阵列设置
+
+mdadm --create /dev/md[0-9] --auto=yes --level=[015] --chunk=NK --raid-devices=N --spare-devices=N 设备名
+
+- 设备名可以是磁盘也可以是分区但这些设备名总数加起来要 等于 --raid-devices=N --spare-devices=N这俩加起来的数量
+- --create 建立RAID
+- --auto=yes
+- --chunk=NK 决定这个磁盘的chunk大小,也可以当成stripe大小,一般是64K或512K
+- --raid-devices=N 使用几个磁盘分区
+- --spare-devices=N 使用几个磁盘作为备用磁盘(热备份)
+- --level=[015] 就是RAID 0,RAID 1,RAID 5这三个模式
+- --detail 列出设备的详细信息
+
+进行恢复
+
+- --manage 设备
+  - --add 设备:添加设备到md
+  - --remove 设备:将设备从md删除
+  - --fail :将设备设为出错
+
+使用软件进行阵列设置后还能使用mkfs.xfs对虚拟后的/dev/md0(这个根据需求选择)进行格式化
+
+mdadm的配置文件/etc/mdadm.conf
+
+### RAID默认是自动开启且挂载如果不想用了需要关闭RAID
+
+
+
+## 逻辑卷管理器
+
+#### 建立LVM流程
+
+- 进行分区并将system ID设为8e
+- PV阶段
+  - pvcreate:将分区建为PV
+  - pvscan:扫描系统里面所有的PV磁盘
+  - pvdisplay:显示出系统上面PV状态
+  - pvremove:将PV属性删除
+- 建立VG阶段
+  - vgcreate:建立VG命令
+  - vgscan:检查VG是否存在
+  - vgdisplay:显示VG状态
+  - vgextend:再VG内增加PV
+  - vgreduce:在VG内删除PV
+  - vgchange:设置VG是否启动
+  - vgremove:删除一个VG
+
+- LV阶段
+  - lvcreate:建立LV
+  - lvscan:查询系统上面的LV
+  - lvdisplay:查看LV状态
+  - lvextend:给LV增加容量
+  - lvreduce:在LV里面减少容量
+  - lvremove:删除LV
+  - lvresize:重新调整大小
+- 对LV进行格式化
+
+
+
+剩下的操作还有扩大LV容量,让LVM具有自动调整功能,创建快照,关闭与开启LVM
+
+#### 扩容
+
+可以直接使用lvresize -L +500M LV分区(使用vgdisplay vg分区 ,来查看) 来进行直接分区
+
+使用这个方法vg必须有剩余的空间,扩容完毕后使用xfs_growfs /srv/lvm进行更新
+
+
+
+==xfs只能放大,ext4能放大能缩小==
+
+
+
+## 计划任务
+
+Linux常见的计划任务有
+
+- 日志的轮询(logrotate):由于日志会越来越大大型文件不但占容量还会影响读写,所有有时候需要将新数据与旧数据分开存放
+
+- 日志文件分析(logwatch):由于日志文件很乱所有一般不用vim等去查看而是使用logwatch查看登录信息
+
+- 建立locate数据库:存储已经存在的文件名,存放在/var/lib/mlocate,通过update自动更新
+- manpage查询数据库:和locate类似,提供快速查询,需要执行mandb才能创建通过系统计划任务来自动执行
+- RPM软件日志,用来跟踪软件
+- 删除缓存(tmpwatch)
+- 与网络有关的分析例如apache
+
+有很多软件也会自动添加计划任务
+
+### 只执行一次的任务
+
+首先我们需要开启单一计划服务atd
+
+```bash
+[root@YH ~]# systemctl restart atd
+[root@YH ~]# systemctl enable atd
+[root@YH ~]# systemctl status atd
+● atd.service - Job spooling tools
+   Loaded: loaded (/usr/lib/systemd/system/atd.service; enabled; vendor preset: enabled)
+   Active: active (running) since Wed 2021-09-22 12:27:24 CST; 20s ago
+ Main PID: 10183 (atd)
+   CGroup: /system.slice/atd.service
+           └─10183 /usr/sbin/atd -f
+
+Sep 22 12:27:24 YH systemd[1]: Started Job spooling tools.
+```
+
+必须enable和running才是真正的启动了
+
+- at
+
+  - 实际上我们使用at是以文本方式写入/var/spool/at/目录里面
+
+  - 但是由于这个命令可能很危险所有会有/etc/at.allow与/etc/at.deny来实现对at的限制
+
+    - 系统会先找at.allow这个文件,没有在这个文件的用户都不能使用at,如果不存在才会区查询at.deny
+    - 如果两个文件都不存在那么只有root才能使用
+
+  - at [-mldv] 时间
+
+    - -m:即使没有输出信息,亦发email通知使用者
+
+    - -l:相当于atq,列出所有该使用者的计划
+
+    - -d:相当于atrm,取消一个计划
+
+    - -v:可以使用较明显的时间格式列出at
+
+    - -c:可以列出后面接的任务实际命令内容
+
+    - 时间
+
+      - HH:MM 今天的某一时刻
+      - HH:MM YYYY-MM-DD:某一天执行
+
+    - ```bash
+      [root@YH ~]# at now + 5 minutes
+      at> /bin/mail -s ""^[[D^H
+      at> ^[[A
+      at> /bin/mail -s "testing at job" root < /root/.bashrc
+      at> <EOT>
+      job 1 at Wed Sep 22 13:55:00 2021
+      [root@YH ~]# at -l
+      1	Wed Sep 22 13:55:00 2021 a root
+      [root@YH ~]# at -c 1
+      ......省略
+      cd /root || {
+      	 echo 'Execution directory inaccessible' >&2
+      	 exit 1
+      }
+      ${SHELL:-/bin/sh} << 'marcinDELIMITER671da34f'
+      /bin/mail -s ""
+      /bin/mail -s "testing at job" root < /root/.bashrc
+      
+      marcinDELIMITER671da34f
+      ```
+
+    - 如果你要定时用echo发送给终端是直接无法发送因为at与用户使用的终端无关所以要使用echo "hello">/dev/tty1来代替
+
+  - batch:系统有时间才执行命令,cpu负载数小于0.8,时才执行(cpu负载数量单一时间负责的任务数量)每分钟检查一次
+
+    - 可以使用这些命令来配合查看
+
+    - uptime查看平均任务负载
+
+    - jobs查看已挂载的程序,不用携带任何参数
+
+    - ```bash
+      [root@YH dev]# echo "scale=100000; 4*a(1)" | bc -lq &
+      [1] 25512
+      You have mail in /var/spool/mail/root
+      [root@YH dev]# echo "scale=100000; 4*a(1)" | bc -lq &
+      [2] 25531
+      [root@YH dev]# echo "scale=100000; 4*a(1)" | bc -lq &
+      [3] 25538
+      [root@YH dev]# echo "scale=100000; 4*a(1)" | bc -lq &
+      [4] 25541
+      [root@YH dev]# uptime
+       14:13:13 up 12 days,  4:26,  2 users,  load average: 0.87, 0.21, 0.17
+      [root@YH dev]# batch
+      at> .u^H^H
+      at> /usr/bin/updatedb
+      at> <EOT>
+      job 3 at Wed Sep 22 14:13:00 2021
+      [root@YH dev]# date;atq
+      Wed Sep 22 14:13:54 CST 2021
+      3	Wed Sep 22 14:13:00 2021 b root
+      [root@YH dev]# jobs
+      [1]   Running                 echo "scale=100000; 4*a(1)" | bc -lq &
+      [2]   Running                 echo "scale=100000; 4*a(1)" | bc -lq &
+      [3]-  Running                 echo "scale=100000; 4*a(1)" | bc -lq &
+      [4]+  Running                 echo "scale=100000; 4*a(1)" | bc -lq &
+      [root@YH dev]# kill -9 %1 %2 %3 %4
+      [root@YH dev]# uptime
+       14:17:42 up 12 days,  4:30,  2 users,  load average: 0.36, 1.11, 0.67
+      You have new mail in /var/spool/mail/root
+      
+      ```
+
+
+
+### 循环执行
+
+- crontab
+
+  - 首先与at一样也有一个/etc/cron.allow和/etc/deny用来限制使用者
+
+  - 任务会放到/var/spool/cron中,cron执行的每一项都会记录到/var/log/cron中
+
+  - -u :只有root才能执行这个任务
+
+  - -e :编辑crontab的内容
+
+  - -l :查看crontab的任务内容
+
+  - -r :删除所有的crontab的任务内容,若仅要删除一项使用-e
+
+  - 使用-e后vi会给你打开
+
+  - 在vi里面加入如下命令即可保存
+
+    ```bash
+     0  12 *  *  *  mail -s "at 12:00" dmtsai</home/dmtsai/.bashrc
+    #分 时 日 月 年 |--------------------命令--------------------|
+    
+    ```
+
+    \*  代表任何时间都接受
+
+    ,  代表分割时间例如 1,2 * * * *:任何时间的第一个分钟和第二分钟都会执行
+
+    \-  代表一段时间内都会执行例如 20 8-12 * * * 代表8点到12点的20分钟都会执行
+
+    /n 代表间隔 例如 \*/5 * * * * 每隔五秒运行一次
+
+  - 注意-e只是针对用户如果要执行系统的则编辑/etc/crontab
+
+  - 系统最低检测是每分钟,所以每分钟都会检测/etc/crontab和/var/spool/cron下的文件
+
+设置系统的循环命令
+
+>vim /etc/crontab
+
+```bash
+SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+
+# For details see man 4 crontabs
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name  command to be executed
+```
+
+MAILTO=root
+
+就代表发生错误就将信息用mail发给root可以改成自己的邮箱例如1834519329@qq.com
+
+PATH=要查找的文件路径(找命令的路径)
+
+==这里的命令与-e不同时间后面接的是身份==
+
+crond服务读取配置的地方有三个:
+
+/etc/crontab
+
+/etc/cron.d/*
+
+/var/spool/cron
+
+==如果你设置了出错报告并发送邮箱结果DNS出错了,导致又要将DNS报告发送这样一直循环会浪费大量的系统资源,所以最好找一个垃圾桶==
+
+
+
+### 可唤醒的停机期间的任务
+
+anacron:被cron执行每小时检测一次
+
+以防止anacron误判时间因此会放在/etc/cron.hourly里面anacron才会在文件之前加一个0让anacron最先执行以免误判crontab未执行的任务
+
+```bash
+[root@YH cron.hourly]# cat /etc/anacrontab 
+# /etc/anacrontab: configuration file for anacron
+
+# See anacron(8) and anacrontab(5) for details.
+
+SHELL=/bin/sh
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+# the maximal random delay added to the base delay of the jobs
+RANDOM_DELAY=45
+# the jobs will be started during the following hours only
+START_HOURS_RANGE=3-22
+
+#period in days   delay in minutes   job-identifier   command
+1	5	cron.daily		nice run-parts /etc/cron.daily
+7	25	cron.weekly		nice run-parts /etc/cron.weekly
+@monthly 45	cron.monthly		nice run-parts /etc/cron.monthly
+
+```
+
+查看anacron的配置
+
+天数|延迟时间|工作名称定义|要执行的命令
+
+anacron的流程大概为:
+
+1. 首先由/etc/anacrontab分析到cron.daily这项任务名称的天数为1天
+2. 从 /var/spool/anacron/cron.daily得出最后一次的时间
+3. 若相差一天则执行
+4. 通过/etc/anacrontab得到将延迟5分+3小时(通过START_HOURS_RANGE设置)
+5. 延迟时间过后运行run-parts /etc/cron.daily
+6. 执行后结束
+
 
 
 ## 进程管理
@@ -3107,9 +3508,12 @@ firewall-cmd --list-ports查看开启
 - /bin:(普通用户和管理员常用命令，存放在**单人维护模式下还能够被使用的命令**)
 - /boot:(主要放置启动会用到的文件)
 - /dev:(任何设备与接口都是以文件形式存放在这个目录)
+  - /sd[a-p]:磁盘阵列
+  - /md[0-9]
   - /shm通常是利用虚拟出来的磁盘通常占内存的一般物理内存,在里面建东西的速度是很快的
 - /usr:(存放系统软件资源，放置的数据属于可分享与不可变动)
   - /bin:所有一般用户能够使用的命令都放在这里。同时此目录下不应该有子目录
+    - /cron:保存crontab -e(非root)的循环任务
   - /lib:与/lib功能相同所以/lib链接到此目录的
   - /local:root在本机安装自己下载的软件，建议安装到本目录，便于管理
   - /sbin:非系统正常运行所需要的系统命令。目前/sbin目录就链接到此目录中的
@@ -3121,12 +3525,14 @@ firewall-cmd --list-ports查看开启
 - /etc:(系统配置文件几乎都在这个目录但只有root有权利修改,==建议不要将可执行文件放在该目录里面==)
   - /passwd:存放各个用户的信息
   - /shadow:存放个人密码
+  - /crontab:系统循环任务
   - /group:所有组个名在这里面
   - /locale.conf:可以修改系统语言
   - /opt（必要）:这个目录在防止第三方辅助软件/opt的相关配置文件
   - /filesystems:系统指定的测试挂载文件系统类型的优先级
   - /shells:显示可以使用的shell
   - /pam.d:用来保存PAM的所有认证配置文件
+  - /mdadm.conf
   - /profile.d
     - /*.sh:这里面所有的用户r权限的文件都会被/etc/profile调用,包含了操作界面的颜色、语系、别名等
   - /sysconfig
@@ -3161,6 +3567,7 @@ firewall-cmd --list-ports查看开启
 - /home:(普通用户的家目录,~回到这个目录下的指定文件)
 - /root:(root用户的家目录，root的家目录和根目录放置在同一个分区中)
 - /proc:(本身是虚拟文件系统，数据都放置在内存中。系统的信息例如内核、进程信息、外接设备、网络状况，他放置的数据都在内存中)
+  - /proc/mdstat:磁盘阵列数据
   - filesystems:Linux已经加载的文件系统类型
 - /sys:不占硬盘容量也是保存系统信息的.
 
