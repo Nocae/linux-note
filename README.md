@@ -635,6 +635,7 @@ umask 设置默认减掉的权限例如umask 777则变成新建文件什么权�
 - -A:全部的文件，连同隐藏的文件，但不包括.与..这两个目录
 - -d:仅列出目录本身，而不是列出目录内的文件数据（常用）
 - -f:直接列出结果，而不进行排序（ls默认会以文件名排序）
+- -Z:显示安全上下文
 - -F:根据文件、目录等信息，给予附加数据结构
   - *:代表可执行文件；/:代表目录；=:代表socket文件；|:代表FIFO文件
   -l:详细信息显示，包含文件的属性与权限等数据（常用）
@@ -1164,6 +1165,10 @@ Number  Start   End     Size    Type     File system  Flags
 
   - -f 强制卸载
   - -l 立即卸载(强制性再-f之上)
+
+> 如果发现无法卸载device is busy则使用fuser -mki 目录  来进行删除
+
+
 
 如果想要改为开机挂载需要修改/etc/fstab文件,但是实际的挂载文件在/etc/mtab内,但是如果fstab这个文件出现语法错误会导致无法开机
 
@@ -3386,9 +3391,40 @@ anacron的流程大概为:
 
 ## 进程管理
 
+Linux的程序一般成为fork-and-exec。进程都会借用fork(复制)的生产方式一个一摸一样的子进程
+
+==一般程序在文件名后面加个d(daemon)代表后台进程==例如atd,crond
+
 #### PS命令
 
 查看当前系统正在执行的进程信息
+
+最常用的两个命令==ps -l== ==ps aux==
+
+![image-20210923141832324](C:\Users\lll\AppData\Roaming\Typora\typora-user-images\image-20210923141832324.png)
+
+其中:
+
+1. F代表权限,4代表root权限,1代表只能复制不能执行
+2. S代表状态,R代表该进程正在运行,S代表正在睡眠,T代表停止运行,D代表不可唤醒状态,Z代表僵尸状态
+3. UID/PID/PPID:
+   1. 此进程被该UID所拥有
+   2. 此进程的PID
+   3. 此进程的父PID
+4. C代表CPU的使用率
+5. PRI代表优先级
+6. ADDR代表内存在哪部分
+7. SZ代表进程用掉了多少内存
+8. WCHAN代表是否在运行 - 表示正在运行
+9. TTY代表登陆这终端
+10. TIME代表CPU占用时间
+11. CMD代表真正运行的命令(==如果这一栏有\<default\>则代表该进程为僵尸进程==)僵尸进程是因为父进程没有完整的结束该进程
+
+![image-20210923142725115](C:\Users\lll\AppData\Roaming\Typora\typora-user-images\image-20210923142725115.png)
+
+用户   PID  CPU占用率  内存占用率  虚拟内存大小  固定内存大小  终端  状态(和上面的意义)  启动时间 CPU占用时间 命令
+
+参数:
 
 - a  显示所有进程
 - -a 显示同一终端下的所有程序
@@ -3410,6 +3446,21 @@ anacron的流程大概为:
 - --help 显示帮助信息
 - --version 显示版本显示
 
+```bash
+[root@YH ~]# ps -alt
+F   UID   PID  PPID PRI  NI    VSZ   RSS WCHAN  STAT TTY        TIME COMMAND
+4     0  1113  1106  20   0 116336  2840 do_wai Ss   pts/2      0:00 -bash
+0  1000  1180  1179  20   0 116204  2720 n_tty_ Ss+  pts/3      0:00 -bash
+4     0  1270     1  20   0 110208   812 n_tty_ Ss+  tty1       0:00 /sbin/agetty --noclear tty1 linux
+4     0  1271     1  20   0 110208   824 n_tty_ Ss+  ttyS0      0:00 /sbin/agetty --keep-baud 115200,38400,9600 ttyS0 vt
+4     0  1324  1113  20   0 153328  1504 -      R+   pts/2      0:00 ps -alt
+4     0 21527 21524  20   0 116336  2852 n_tty_ Ss+  pts/0      0:00 -bash
+0  1000 21618 21617  20   0 116204  2740 n_tty_ Ss+  pts/1      0:00 -bash
+
+```
+
+PID指代当前进程的号，PPID指代父进程的PID
+
 >| 在Linux中这个叫管道符号 比如A|B将A命令运行的结果送给B
 >
 >grep 查找文件中符合条件的字符串
@@ -3418,11 +3469,19 @@ ps -aux|grep mysql这个命令就可以查看所有有关mysql的进程
 
 ps -ef可以看父进程（一般不这么用看父目录可以使用pstree）
 
+
+
 >详细请看这个网站
 >
 >https://www.cnblogs.com/xiangtingshen/p/10920236.html
 
+
+
+
+
 #### kill命令
+
+==kill命令是用来控制其他进程的不单单只是杀死==
 
 命令参数
 
@@ -3430,6 +3489,7 @@ ps -ef可以看父进程（一般不这么用看父目录可以使用pstree）
 - -1 重启一个进程
 - -15 正常停止一个进程
 - -l <信息编号> 　若不加<信息编号>选项，则 -l 参数会列出全部的信息名称
+- 后面一般接进程的PID如果想要管理bash任务就要用%+数字
 
 例如
 
@@ -3439,17 +3499,23 @@ ps -ef可以看父进程（一般不这么用看父目录可以使用pstree）
 kill -9 123456
 ```
 
-
-
 杀死指定用户所有进程
 
 ```bash
 kill -9 $(ps -ef | grep hnlinux) //方法一 过滤出hnlinux用户进程 kill -u hnlinux //方法二
 ```
 
-
-
 >https://www.runoob.com/linux/linux-comm-kill.html
+
+
+
+#### killall
+
+通过名称对进程下命令
+
+- -i 代表交互式
+- -e 代表后面要接的命令完全一致
+- -I 忽略大小写
 
 
 
@@ -3460,6 +3526,455 @@ kill -9 $(ps -ef | grep hnlinux) //方法一 过滤出hnlinux用户进程 kill -
 Linux pstree命令将所有行程以树状图显示，树状图将会以 pid (如果有指定) 或是以 init 这个基本行程为根 (root)，如果有指定使用者 id，则树状图会只显示该使用者所拥有的行程。
 
 > https://www.runoob.com/linux/linux-comm-pstree.html
+
+
+
+```bash
+[root@YH ~]# pstree
+systemd─┬─YDLive───6*[{YDLive}]
+        ├─YDService───20*[{YDService}]
+        ├─abrt-dbus───3*[{abrt-dbus}]
+        ├─acpid
+        ├─2*[agetty]
+        ├─atd
+        ├─auditd───{auditd}
+        ├─barad_agent─┬─barad_agent
+        │             └─barad_agent───2*[{barad_agent}]
+        ├─crond
+        ├─dbus-daemon
+        ├─dhclient
+        ├─iscsid
+        ├─lsmd
+        ├─lvmetad
+        ├─master─┬─pickup
+        │        └─qmgr
+        ├─nginx───nginx
+        ├─ntpd
+        ├─polkitd───6*[{polkitd}]
+        ├─rshim───{rshim}
+        ├─rsyslogd───2*[{rsyslogd}]
+        ├─sgagent───{sgagent}
+        ├─sshd───sshd───bash───pstree
+        ├─systemd-journal
+        ├─systemd-logind
+        ├─systemd-udevd
+        ├─tat_agent───4*[{tat_agent}]
+        └─tuned───4*[{tuned}]
+
+```
+
+可以看出所有的进程都是托管子systemd下面
+
+
+
+#### Linux的多人多任务环境
+
+- 多人
+  - 为啥会多人呢,就是因为每个人登陆后获取的BASH的PID不同
+- 多任务
+  - CPU可以进行任务的切换与调度
+- 多重登录的七个终端界面
+  - 当前Linux提供了六个命令登录界面,以及一个图形界面可以使用ALT+F1-7来切换终端,每个终端的登录者不同
+- linux不像Windows一样因为某个进程出错而要重启,只需要切换终端杀死即可
+- 使用&来将进程放到后台例如
+  - cp file1 file2 &
+  - 这样进程就会放到后台
+
+
+
+#### top:查看进程的变化(持续查看)
+
+- -d 秒数:刷新间隔
+- -b 以批量的方式执行top
+- -n 与-b搭配代表执行几次top结果
+- -p 指定某些PID来执行查看检测而已
+- 是一种类似Windows任务管理器的查看方式进入top后按h可以查看到相关命令
+
+![image-20210923144205956](C:\Users\lll\AppData\Roaming\Typora\typora-user-images\image-20210923144205956.png)
+
+基本分为6行
+
+1. 显示目前时间,经过时间,已经在线人数,系统在1\5\15分钟的平均任务负载
+2. 显示目前进程总数与个别进程的状态还有最后一个zombie代表僵尸进程个数
+3. 显示CPU的负载
+4. 4-5行表示物理内存与虚拟内存的使用情况
+5. 在当前top进程中输入命令显示的地方
+
+按下M使用内存使用率排序按P(以CPU使用率来排序)恢复按q退出
+
+
+
+
+
+
+
+### 进程之间的相互管理
+
+如果我没想要管理进程其实是使用一个进程来控制另一个进程,而进程之间是用信号来管理的查看信号可以使用
+
+kill -l(放心杀不了进程)或使用man 7 signal(如果报错就用yum 安装)
+
+
+
+### 任务管理
+
+由于/etc/security/limits.conf文件会设置用户的连接数,某些用户只能以一个连接来工作所以出错后不能切换到别的终端进行处理,所以加入了任务管理
+
+有些进程需要与用户进行交互所以成为前台,而不需要交互的称为后台
+
+后台程序不能使用ctrl+c来终止
+
+任务管理的限制:
+
+- 这些任务的触发必须来自于你的shell子进程
+- 前台:可控制与执行命令的环境称为前台
+- 后台:可以自动执行的任务,可以使用bg,fg来调用
+- 后台中执行的进程不能等待terminal或shell的输入
+
+
+
+使用&可以将命令在后台运行但是建议加上流控制这样免得报错或者提示信息将控制台弄的乱七八糟.
+
+如果想要将正在运行的程序放到后台中使用ctrl+z
+
+
+
+列出目前后台的状态jobs
+
+- jobs
+
+  - -l 除了job number与命令串之外,同时列出PID
+
+  - -r 列出正在运行的任务
+
+  - -s 列出stop的程序
+
+  - 结果中+代表默认使用的任务使用fg即可得到
+
+  - ```bash
+    [root@YH YH]# logout
+    There are stopped jobs.
+    [root@YH YH]# jobs
+    [1]+  Stopped                 vim cron.txt
+    [root@YH YH]# fg
+    vim cron.txt
+    
+    [1]+  Stopped                 vim cron.txt
+    [root@YH YH]# vim readAgrs.sh 
+    
+    [2]+  Stopped                 vim readAgrs.sh
+    [root@YH YH]# jobs
+    [1]-  Stopped                 vim cron.txt
+    [2]+  Stopped                 vim readAgrs.sh
+    [root@YH YH]# fg
+    vim readAgrs.sh
+    [root@YH YH]# jobs
+    [1]+  Stopped                 vim cron.txt
+    
+    ```
+
+- fg:获取后台服务
+
+  - fg [%number]
+
+    - number后台服务的任务号
+
+    - 可以使用fg -来获取带有-的任务
+
+    - ```bash
+      [root@YH YH]# jobs
+      [1]   Stopped                 vim cron.txt
+      [2]-  Stopped                 vim fstab
+      [3]   Stopped                 vim installPath.txt
+      [4]+  Stopped                 vim diff_fstab
+      [root@YH YH]# fg -
+      这样就直接获取任务2了
+      ```
+
+    - 什么都不加获取带有+的任务
+
+- bg:让后台任务运行
+
+  - bg %number
+
+
+
+### 脱机管理
+
+由于任务管理在用户退出Linux后任务也会自动终端所以可以使用nohup来处理这个命令.(也可以使用at 命令)
+
+但是nohup不支持bash的内置命令
+
+nohup这本书介绍的不多自己查吧
+
+
+
+#### 关于CPU的调度顺序
+
+Priority:PRI,值越低优先级越高.用户无法调整
+
+Nice:NI PRI(new) = PRI(old)+NI,虽然我们可以手动调整NI但并不一定会按照理想的调整
+
+例如:PRI = 50 我们调整NI为5 PRI并不一定等于55因为是系统自动调整的
+
+NI的取值范围(-20~19)
+
+
+
+- nice 执行新命令并给予一个nice
+  - -n 数字
+- renice 对一个已经执行的命令给予一个NI值
+
+
+
+#### 查看系统资源
+
+free查看内存使用
+
+- -h最常用会显示单位
+- -t输出结果显示物理内存与swap总量
+
+
+
+```bash
+[root@YH ~]# free -ht
+              total        used        free      shared  buff/cache   available
+Mem:           1.8G        226M        1.3G        640K        286M        1.4G
+Swap:            0B          0B          0B
+Total:         1.8G        226M        1.3G
+```
+
+有时候我们会遇到woc,buff/cache为啥把所有的内存都站了....没事因为正是因为你系统没啥东西可能导致的,再就是经常读写文件修改配置等导致的,如果你要用系统会自动调控的.
+
+看到available了嘛那个才是真正能用的内存数量
+
+
+
+#### uname查看内核信息
+
+-a查看所有
+
+#### uptime查看系统启动时间与任务负载
+
+#### netstat网络追踪与socket文件
+
+- -a 所有
+- -u udp的
+- -t tcp的
+- -n 以端口列出服务名
+- -l 列出正在监听的服务
+- -p 列出网络进程的PID
+
+显示数据分为两部分
+
+```bash
+[root@YH ~]# netstat -a
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State      
+tcp        0      0 0.0.0.0:http            0.0.0.0:*               LISTEN     
+tcp        0      0 0.0.0.0:ssh             0.0.0.0:*               LISTEN     
+tcp        0      0 VM-0-5-centos:smtp      0.0.0.0:*               LISTEN     
+tcp        0      0 YH:58988                169.254.0.138:d-s-n     ESTABLISHED
+tcp        0      0 YH:ssh                  153.118.35.43:22177     ESTABLISHED
+tcp        0      0 YH:ssh                  153.118.35.43:21795     ESTABLISHED
+tcp        0      0 YH:55572                169.254.0.55:webcache   TIME_WAIT  
+tcp        0     52 YH:ssh                  153.118.35.43:21834     ESTABLISHED
+tcp        0      0 YH:ssh                  153.118.35.43:21817     ESTABLISHED
+tcp        0      0 YH:42208                169.254.0.55:lsi-bobcat ESTABLISHED
+tcp        0      0 YH:ssh                  153.118.35.43:21899     ESTABLISHED
+tcp6       0      0 [::]:ssh                [::]:*                  LISTEN     
+tcp6       0      0 VM-0-5-centos:smtp      [::]:*                  LISTEN     
+udp        0      0 0.0.0.0:bootpc          0.0.0.0:*                          
+udp        0      0 YH:ntp                  0.0.0.0:*                          
+udp        0      0 VM-0-5-centos:ntp       0.0.0.0:*                          
+udp6       0      0 VM-0-5-centos:ntp       [::]:*                             
+udp6       0      0 YH:ntp                  [::]:*   
+```
+
+- proto:协议
+- Recv-Q:非由用户进程连接的Bytes总数
+- Send-Q:非由远程用户传送过来的Bytes总数
+- Local: Address本地连接地址
+- Foreign: Address远程连接地址
+- State: 状态ESTABLISHED为建立LISTEN为监听
+
+
+
+另一部分sockets文件
+
+```bash
+Active UNIX domain sockets (servers and established)
+Proto RefCnt Flags       Type       State         I-Node   Path
+unix  2      [ ACC ]     STREAM     LISTENING     13829    /var/run/lsm/ipc/sim
+unix  2      [ ACC ]     STREAM     LISTENING     17652    public/pickup
+unix  2      [ ACC ]     STREAM     LISTENING     17656    public/cleanup
+unix  2      [ ACC ]     STREAM     LISTENING     17659    public/qmgr
+unix  2      [ ACC ]     STREAM     LISTENING     17663    private/tlsmgr
+unix  2      [ ACC ]     STREAM     LISTENING     17666    private/rewrite
+unix  2      [ ACC ]     STREAM     LISTENING     13003    @ISCSID_UIP_ABSTRACT_NAMESPACE
+unix  2      [ ACC ]     STREAM     LISTENING     17669    private/bounce
+```
+
+- proto:一般为unix
+- RefCnf:连接到此socket的进程数量
+- Flags:连接的标识
+- Type:socket取值类型,stream(需要确认)和dgram(不需要确认)
+- state:若为connected代表多个进程之间已经建立连接
+- path:连接到此socket的相关进程路径
+
+> 列出所有开放的端口命令
+>
+> netstat -tulnp
+
+
+
+#### dmesg分析内核产生信息
+
+建议管道过滤以下
+
+#### vmstat检测系统资源变化
+
+```bash
+[root@YH ~]# vmstat -a
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free  inact active   si   so    bi    bo   in   cs us sy id wa st
+ 4  0      0 1341564  85916 237060    0    0     1    32   21   32  1  1 99  0  0
+ --进程字段
+# r等待运行的进程数量
+# b不可被幻型的进程数量
+--内存字段
+# swpd虚拟内存被使用的容量
+# free未被使用的内存容量
+# buff用于缓冲存储器
+# cache用于高速缓存
+--交换内存分区
+# si由硬盘中将进程取出的容量
+# so由于内存不足而将没用到的进程写入到磁盘的swap容量
+--硬盘读写
+#bi:磁盘读入的块数
+#bo:写到磁盘的快数
+--系统
+#in:每秒被中断的进程次数
+#cs:每秒执行的次数
+--CPU
+#us:非内核的CPU状态
+#sy:内核层CPU状态
+#id:闲置状态
+#wa:等待I/O所耗费的CPU
+#st:被虚拟机所使用的CPU
+```
+
+参数自己查把
+
+
+
+#### /proc/*
+
+我们提到的所谓的进程都在内存中,而内存又写到了/proc/*这个文件中PID为1就是/proc/1
+
+基本都有很多关于进程的文件
+
+```bash
+[root@YH 1]# cat cmdline 
+/usr/lib/systemd/systemd--switched-root--system--deserialize22
+[root@YH 1]# cat environ 
+```
+
+cmdline命令串
+
+environ环境变量内容
+
+具体每个文件啥样看文档吧https://blog.csdn.net/xiaodingqq/article/details/79943648
+
+#### fuser通过文件找出正在使用该文件的进程
+
+如果你要卸载某个分区但发现该分区为忙碌的可以使用该命令
+
+- -u:列出使用者
+- -m:对umount不成功有效,后面接文件名会主动地提到该文件系统的最顶层
+- -v:可以列出每个文件与进程还有命令的相关性
+- -k:找出使用该文件/目录的PID,并试图以SIGKILL这个信号给予PID
+- -i:必须与-k配合
+- -signal: 例如-1 ,-15如果不给出则默认-9
+
+
+
+fuser -uv .列出当前目录使用的PID/所属账号/权限
+
+```bash
+[root@YH YH]# fuser -uv .
+                     USER        PID ACCESS COMMAND
+/usr/local/YH:       root     kernel mount (root)/usr/local/YH
+                     root        972 ..c.. (root)bash
+#关于access的值c代表当前目录下,e代表可被触发的执行状态,f是一个被开启的文件,r代表顶层目录,F代表文件被使用,不过在等待响应中,m代表可能是共享的动态函数库
+```
+
+
+
+模拟我要卸载/home但是被占用了
+
+```bash
+[root@YH home]# fuser -uv .
+                     USER        PID ACCESS COMMAND
+/home:               root        972 ..c.. (root)bash
+                     stranger   2333 ..c.. (stranger)bash
+```
+
+通过fuser -mki /home来进行移除
+
+
+
+#### lsof列出被进程所使用的文件名
+
+和fuser相反,fuser是通过文件来找出进程,而lsof是通过进程找出文件
+
+-a 更改属性
+
+-u 所属使用者
+
+
+
+#### pidof找出某个正在执行的进程的pid
+
+
+
+### SELinux
+
+避免资源被误用,传统的文件权限与账号的关系以策略规则指定特定进程读取特定文件
+
+以前没使用SELinux的DAC,权限只有普通的rwx,这样很难针对性进行权限设置,例如我们有个www服务器里面有一个httpd假设被别人攻击并获取后它可以修改其他777权限的目录
+
+但是使用了MAC后对httpd这个进程进行设置,为只在/var/www/html这个文件夹下有权限其他文件夹去都去不了就可以了
+
+
+
+SELinux的相关的东西
+
+- 主体:SELinux主要管理的就是进程,所以进程与主体基本一样
+- 目标:主体能否进行读写的目标资源,可理解为文件系统
+- 策略:根据策略来指定
+  - targeted:针对网络服务较多,默认策略
+  - minimum:由target自定义而来针对选择的进程来保护
+  - mls:完整的SELinux限制
+  - 安全上下文:==放在inode里面==
+
+主体与目标的安全上下文必须一致才能顺利读写
+
+查看目录下的安全上下文ls -Z
+
+用两个冒号划分为三段
+
+Identify:role:type
+
+- Identify:账号的身份识别
+  - unconfined_u:不受限制的用户,不受SELinux管制(一般由用户产生)
+  - system_u:系统用户(一般由系统产生)
+- Role:角色
+  - object_r:代表文件或目录
+  - system_r:代表的是进程
+- Type(最重要):类型一般一个主体能不能读取文件或资源与这个字段有关
+  - type:文件资源(Object)上面称为类型(Type)
+  - domain:在主体进程(Subject)则称为域(Domain)
 
 
 
@@ -3569,6 +4084,7 @@ firewall-cmd --list-ports查看开启
 - /proc:(本身是虚拟文件系统，数据都放置在内存中。系统的信息例如内核、进程信息、外接设备、网络状况，他放置的数据都在内存中)
   - /proc/mdstat:磁盘阵列数据
   - filesystems:Linux已经加载的文件系统类型
+  - 数字目录都是进程中的pid比如/proc/1就是对应进程中pid为1的进程,里面存放着相关进程的信息
 - /sys:不占硬盘容量也是保存系统信息的.
 
 [^#]: 
