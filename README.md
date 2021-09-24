@@ -3978,6 +3978,98 @@ Identify:role:type
 
 
 
+关于SELinux的三种模式
+
+- Enforcing :强制模式,任何操作都需要进行检测如果不满足策略则直接拦截
+- Permissive:兼容模式,任何操作都进行检测但是不满足不会拦截而是记录在log内
+- Disable   :关闭模式
+
+
+
+getenforce:列出目前模式
+
+sestatus:列出目前的SELinux使用的哪个策略
+
+```bash
+[root@VM-0-5-centos bin]# ls -al | grep 'bash'
+-rwxr-xr-x.  1 root root      964536 Apr  1  2020 bash
+lrwxrwxrwx.  1 root root          10 Aug  7  2020 bashbug -> bashbug-64
+-rwxr-xr-x.  1 root root        6964 Apr  1  2020 bashbug-64
+lrwxrwxrwx.  1 root root           4 Aug  7  2020 sh -> bash
+[root@VM-0-5-centos bin]# sestatus 
+SELinux status:                 enabled
+SELinuxfs mount:                /sys/fs/selinux
+SELinux root directory:         /etc/selinux
+Loaded policy name:             targeted
+Current mode:                   permissive
+Mode from config file:          permissive
+Policy MLS status:              enabled
+Policy deny_unknown status:     allowed
+Max kernel policy version:      31
+```
+
+
+
+getsebool查看各个规则的bool值
+
+chcon [-R] [-t type] [-u user] [-r role] 文件 修改SELinux类型
+
+- -R :连同子目录也修改
+- -t :后面接安全上下文的类型栏
+
+用chcon修改文件我指定的类型
+
+或使用chcon --reference=范例文件 文件  将文件设为范例文件的类型
+
+
+
+restorecon -Rv 文件名
+
+让文件恢复正确的SELinux
+
+
+
+```bash
+[root@YH YH]# ls -Z
+drwxr-xr-x. root root unconfined_u:object_r:usr_t:s0   test1
+[root@YH YH]# chcon -t aaa test1
+[root@YH YH]# ls -Z
+drwxr-xr-x. root root unconfined_u:object_r:aaa:s0     test1
+[root@YH YH]# restorecon test1
+[root@YH YH]# ls -Z
+drwxr-xr-x. root root unconfined_u:object_r:usr_t:s0   test1
+```
+
+
+
+==/etc/selinux/config这个文件用来修改模式==
+
+如果只是从宽容改成强制可以使用setenforce [0|1]
+
+0为宽容
+
+1为强制
+
+为啥restorecon可以还原目录与文件的安全上下文.
+
+semanage默认目录的修改与查看
+
+
+
+#### 关于日志协助
+
+日志信息放在/var/log/message与/var/log/setroubleshoot,但是需要安装setroubleshoot与setroubleshoot-server
+
+安装完成后需要重启auditd
+
+
+
+==这个SELinux讲的真cha！！！==
+
+
+
+> ==如果由于SELinux配置出问题可以使用restorecon -Rv /来还原==
+
 ## 安装jdk
 
 https://blog.csdn.net/pdsu161530247/article/details/81582980
