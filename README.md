@@ -4070,6 +4070,271 @@ semanage默认目录的修改与查看
 
 > ==如果由于SELinux配置出问题可以使用restorecon -Rv /来还原==
 
+
+
+## 服务
+
+一般服务的后缀名都带有一个d(daemon)字代表后台执行例如atd，crond
+
+顺带提一嘴se开头的与SELinux有关
+
+
+
+==有时服务是有依赖的所以关闭一个可能没用==
+
+
+
+现在的systemd启动方式与传统unix的init启动方式的优点
+
+- 并行处理加快了启动速度
+  - 由于init是一个一个的启动服务因为要依赖很多服务,由于现在由于主机和操作系统支持多内核所以可以同时启动
+- 一命令管理
+  - systemd的全部就是仅有一个systemctl来处理的,不像init启动不同的需要不同的命令
+- 服务依赖的自动检查
+  - 如果你要启动一个服务需要另一个依赖,system会自动帮你检查然后帮你启动
+- 更多的功能分类便于管理
+  - 现在系统的system功能将服务统一为一个unit单元然后进行分类为比以前更合理的分类便于记忆
+- 打包运行
+  - 根据以前的init的5级别的运行特色,systemd将很多功能集合成一个所谓的target项目.亦或是执行了某个target就执行了很多个daemon项目
+- 兼容init,但是也有一些不支持
+  - 只有1,3,5级别
+  - 全部都是systemctl进行管理,而systemctl语法有限制并且没法自定义
+  - 如果手动启动某个服务systemd就无法检测到该服务(例如用crond启动啥啥啥)
+  - systemd启动过程中无法交互,所以如果自己写systemd的启动程序时候要避免交互式
+
+
+
+### systemd的配置文件与目录
+
+/usr/lib/systemd/system/:每个服务最主要的管理系统,官方提供的软件安装后启动程序都放在这个目录下面
+
+/run/systemd/system/:系统执行过程中所产生的服务脚本,比上面的优先级高
+
+/etc/systemd/system/:管理员根据系统要求建立的脚本,比上面那两条的优先级高
+
+/etc/sysconfig/*:几乎所有服务都会将初始化的一些选项设置写入到这个目录
+
+/var/lib:产生数据的服务写入到这个目录
+
+/run/:放置daemon的缓存
+
+/etc/services定义服务与端口的映射
+
+
+
+修改启动设置要去/usr/lib/systemd/system下面
+
+要管理哪些启动哪些不启动要去/etc/systemd/system下面
+
+
+
+#### 主要常用服务以及后缀名
+
+| 后缀名             | 主要服务功能                                                 |
+| ------------------ | ------------------------------------------------------------ |
+| .service           | 一般服务类型,最常见的                                        |
+| .socket            | 多半用于数据交互,本地用的多                                  |
+| .target            | 一群unit的集合,一般执行一个.target就相当于执行了一堆.service和.socket |
+| .mount和.automount | 文件系统相关的挂载的服务,用于管理系统的各个挂载              |
+| .path              | 用来检测目录然后提供队列服务                                 |
+| .timer             | systemd主动执行的循环服务                                    |
+
+
+
+
+
+
+
+### 使用systemctl来管理服务
+
+**systemctl**
+
+命令部分:
+
+- systemctl [command] [unit]
+
+  - 单一服务控制
+
+    - start :立即启动后面接的unit
+    - stop :立即停止后面接的unit,但可能因为其他服务导致重新激活
+    - restart :立即重启后接unit
+    - reload :不关闭服务的情况下重启加载配置文件
+    - enable :设置下次开机自启动后接unit
+    - disable :设置下次开机后不启动unit
+    - is-active:是否启动
+    - is-enable:是否自启动
+    - status:查看unit状态
+    - mask:注销服务不会被激活
+    - unmask:取消注销
+
+  - 查看所有服务
+
+    - list-units:依据目前启动的unit,加上--all显示没有启动的
+    - list-unit-files:一局/usr/lib/systemd/system内的文件,将所有文件列表说明
+    - --type=TYPE 就是上面那个表里面那个[类型](####主要常用服务以及后缀名)
+
+    - list-sockets
+
+  - 常见的target(下面的都在.target就不写了)
+
+    - graphical:命令加上图形界面
+    - multi-user:纯命令
+    - rescue:无法使用root登录的情况下滋生的额外系统
+    - emergency:紧急处理系统的错误
+    - shutdown:关机
+    - getty:设置你需要的tty
+
+  - 切换不同的操作系统模式
+
+    - get-default:取得目前的模式
+    - set-default:设置默认的启动模式
+    - isolate:切换到后面接的模式
+    - poweroff:关机
+    - reboot:重启
+    - suspend:挂起(数据保存到内存中,关闭大部分的硬件设备)
+    - hibernate:休眠(数据保存到硬盘然后关机)
+    - rescue:强制进入恢复模式
+    - emergency:强制进入紧急恢复模式
+
+  - 通过systemctl分析各个服务之间的依赖
+
+    - list-dependencies [unit] [--reverse]
+      - --reverse:反向追踪
+
+==在.service才使用start、stop、restart等命令，但是在.target时候用isolate==
+
+
+
+内容解析
+
+```bash
+● firewalld.service - firewalld - dynamic firewall daemon
+   Loaded: loaded (/usr/lib/systemd/system/firewalld.service; disabled; vendor preset: enabled)
+   Active: active (running) since Sun 2021-09-26 09:39:13 CST; 17min ago
+     Docs: man:firewalld(1)
+ Main PID: 28544 (firewalld)
+   CGroup: /system.slice/firewalld.service
+           └─28544 /usr/bin/python2 -Es /usr/sbin/firewalld --nofork --nopid
+
+Sep 26 09:39:13 YH systemd[1]: Starting firewalld - dynamic firewall daemon...
+Sep 26 09:39:13 YH systemd[1]: Started firewalld - dynamic firewall daemon.
+Sep 26 09:39:14 YH firewalld[28544]: WARNING: AllowZoneDrifting is enabled. This is considered an insecure configuration option... it now.
+Hint: Some lines were ellipsized, use -l to show in full.
+```
+
+- Loaded:说明不自启动
+
+- Active:正在执行(running)
+  - exited:执行一次就结束
+  - waiting需要等待
+  - inactive:没有运行的意思
+
+后面是PID
+
+下面是日志 时间 发送给哪一台主机 哪一个服务信息 内容是啥
+
+
+
+### systemctl针对service类型的配置文件
+
+以sshd为例子
+
+```bash
+[root@YH ~]# cat /usr/lib/systemd/system/sshd.service 
+[Unit]
+Description=OpenSSH server daemon
+Documentation=man:sshd(8) man:sshd_config(5)
+After=network.target sshd-keygen.service
+Wants=sshd-keygen.service
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/sysconfig/sshd
+ExecStart=/usr/sbin/sshd -D $OPTIONS
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=42s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+unit:对本身的说明,以及与其他依赖的设置,什么时候启动
+
+Service、Socket、Timer、Mount、Path:不同的unit类型对应着不同设置项目.所以这里是Service 这个项目主要用来规范服务启动的脚本、环境配置文件名、重启的方式
+
+Install:这个项目就是将此unit安装到哪个target里面
+
+
+
+其他:
+
+> 项目内的设置通常是可以重复的,例如在[Unit]里面设置了两个After这样后面哪个After会覆盖前面那个
+> 如果项目需要设置[是/否]的布尔值项目可以使用1,yes,true,on代表开启 0,no,false,off代表关闭 
+> 空白行,#开头或;那一行都代表注释
+
+
+
+表格说明:
+
+Unit部分
+
+| 参数          | 含义                                                  |
+| ------------- | ----------------------------------------------------- |
+| Description   | systemctl list-units时进行输出的介绍                  |
+| Documentation | 手册                                                  |
+| After         | 强调在那个项目之后执行,不是强制性只是用来说明启动顺序 |
+| Before        | 与After相反                                           |
+| Requires      | 是在什么服务启动之前最好启动这个服务                  |
+| Wants         | 与Requires相反,在什么程序启动之后才能够启动这个       |
+| Conflicts     | 代表冲突的服务.就是后接的项目如果启动则不启动         |
+
+Service
+
+| 参数            | 含义                                                         |
+| --------------- | ------------------------------------------------------------ |
+| Type            | simple默认值,这个daemon主要由ExecStart,接的命令来启动,启动后常驻于内存<br />forking:由ExecStart启动的程序通过spawns扩展出来的程序作为该程序的主要服务,在原生父进程启动结束后终止运行<br />oneshot:与simple类似,不过这个进程在工作完毕就关闭不驻于内存<br />dbus:与simple类似,但这个daemon必须要在获取一个D-Bus的名称后,才会继续运行通常要设置BusName=才行<br />idle:与simple类似,意思是要执行这个daemon必须要所有的工作都顺利执行完毕后才会执行通常是开机最后任务 |
+| EnvironmentFile | 可以指定启动脚本的环境配置文件                               |
+| ExecStart       | 实际执行daemon的命令或者脚本                                 |
+| ExecStop        | 关闭服务的命令                                               |
+| ExecReload      | 与重新加载配置文件有关                                       |
+| Restart         | 当为1时关闭该服务会立即再次开启                              |
+| RemainAfterExit | 为1时,这个daemon所属的进程都终止之后会再次尝试启动           |
+| TimeoutSec      | 这个服务在启动或者关闭时,因为某些命令无法顺利运行的我们要等多久才能进入强制结束状态 |
+| KillMode        | process:daemon终止时只终止主要进程ExecStart后接的命令串<br />control-group:daemon终止时此daemon所产生的其他control-group进程都会关闭<br />none:daemon终止时没有进程被关闭 |
+| RestartSec      | 服务被关闭需要多少秒才能重新启动                             |
+
+
+
+Install
+
+| 参数     | 含义                                                         |
+| -------- | ------------------------------------------------------------ |
+| WabtedBy | 大部分时.target的含义是依附于那个target                      |
+| Also     | 当前这个unit本身被enable,Also后接的unit也请enable的意思(一般是依赖服务) |
+| Alise    | 运行一个连接的别名                                           |
+
+
+
+## 云服务器安装samba
+
+腾讯云为了安全禁用了samba的两个端口地址需要改映射
+
+https://blog.csdn.net/zsdt345a780rfajwet/article/details/107845859
+
+
+
+
+
+### 创建自己的服务
+
+只需要创建一个.sh的脚本文件在任何文件夹
+
+然后写一个/etc/systemd/system/*.service的配置文件与刚刚的脚本文件建立关联就可以使用systemctl进行管理了
+
+
+
 ## 安装jdk
 
 https://blog.csdn.net/pdsu161530247/article/details/81582980
@@ -4122,6 +4387,8 @@ firewall-cmd --list-ports查看开启
   - /bin:所有一般用户能够使用的命令都放在这里。同时此目录下不应该有子目录
     - /cron:保存crontab -e(非root)的循环任务
   - /lib:与/lib功能相同所以/lib链接到此目录的
+    - /systemd/
+      - system/:每个服务最主要的管理系统
   - /local:root在本机安装自己下载的软件，建议安装到本目录，便于管理
   - /sbin:非系统正常运行所需要的系统命令。目前/sbin目录就链接到此目录中的
   - /share:存放命令帮助文档和者软件帮助文档，几乎都是文本文件
@@ -4130,6 +4397,8 @@ firewall-cmd --list-ports查看开启
   - /libexec:某些不被一般用户常用的执行文件或脚本
   - /src:一般源码放在这里
 - /etc:(系统配置文件几乎都在这个目录但只有root有权利修改,==建议不要将可执行文件放在该目录里面==)
+  - /systemd
+    - /system/:管理员根据系统要求建立的脚本,优先级比/run/systemd/system高
   - /passwd:存放各个用户的信息
   - /shadow:存放个人密码
   - /crontab:系统循环任务
@@ -4140,6 +4409,7 @@ firewall-cmd --list-ports查看开启
   - /shells:显示可以使用的shell
   - /pam.d:用来保存PAM的所有认证配置文件
   - /mdadm.conf
+  - /services:定义端口与服务的映射
   - /profile.d
     - /*.sh:这里面所有的用户r权限的文件都会被/etc/profile调用,包含了操作界面的颜色、语系、别名等
   - /sysconfig
@@ -4163,6 +4433,9 @@ firewall-cmd --list-ports查看开启
 - /run:系统启动后所产生的各项信息
 - /tmp:一般用户或正在执行的程序暂时放置文件的地方。任何人都可以存取，建议在启动时将本目录下数据都清除
 - /run或/tmp数据接口文件常用来通过soocket来进行数据沟通
+  - /run
+    - /systemd
+      - /system/:系统执行过程中所产生的服务脚本,优先级比/usr/lib/systemd/system高
 - /lib:(放置的是启动时会用到的库函数,以及在/bin和/sbin下面的命令会调用的库函数)
   - /modules:放置驱动程序
     - $(uname -r)/kernel/fs
