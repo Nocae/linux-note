@@ -4317,6 +4317,284 @@ Install
 
 
 
+#### 关于Systemctl针对timer的配置文件
+
+systemd.timer的优势
+
+- 由于所有的systemd的服务所产生的信息都会被记录（log），因此比crond在debug上面要清楚。
+- 各项timer的任务可以跟systemd的服务相结合
+- 各项timer的任务可以跟control group结合
+
+
+
+想要使用timer的必要条件：
+
+1. 操作系统的timer.target一定要启动
+2. 要有个*.service的服务存在
+3. 要有个*.timer的时间启动服务存在
+
+
+
+在/etc/systemd/system下面建立一个*.timer文件要有下面这些内容
+
+| 参数              | 含义                                                         |
+| ----------------- | ------------------------------------------------------------ |
+| OnActiveSec       | 当timers.target启动后多久才启动这个unit                      |
+| OnBootSec         | 当启动完成后多久才执行                                       |
+| OnStartupSec      | 当systemd第一次启动之后多久才执行                            |
+| OnUnitActionSec   | 这个timer配置文件所管理的那个unit服务在最后一次启动隔多久在启动 |
+| OnUnitInactiveSec | 这个timer配置文件所管理的unit服务最后一次停止后隔多久在执行一次 |
+| OnCalendar        | 使用实际时间的方式来启动服务                                 |
+| Unit              | 在.timer中要制定哪一个server unit                            |
+| Persistent        | 当使用OnCalender的设置时,指定该功能要不要持续进行的意思      |
+
+关于OnCalender的时间如果想要从crontab转换成这个timer功能的话,需要了解时间设置格式
+
+语法:英文周名 YYYY-MM-DD HH:MM:SS
+
+例子 Thu     2015-08-13 13:13:13
+
+也可以使用时间间隔为分割 (时间)(单位),或者使用英文单词
+
+例如
+
+首先编写如下文件
+
+```bash
+[root@YH system]# cat YH_backup.timer 
+[Timer]
+OnBootSec=2hrs
+OnUnitActiveSec=2days
+[Install]
+WantedBy=multi-user.target
+```
+
+然后进行运行
+
+```bash
+[root@YH system]# systemctl enable YH_backup.timer
+[root@YH system]# systemctl restart YH_backup.timer
+```
+
+
+
+## 日志
+
+==一般日志文件只有root能看==
+
+- /var/log
+  - /boot.log:开机启动的时候系统内核会去检测与启动硬件
+  - /cron:记录crontab执行知否出错
+  - /dmesg:记录系统在开机的时候内核检测过程所产生的各项信息.
+  - /lastlog:最近一次登录的信息
+  - /maillog或/mail/*:记录邮件来往信息
+  - ==/messages:几乎系统出错的信息都在上面==
+  - /secure:涉及到输入用户名密码的都在上面
+  - /wtmp:正确登录的账户信息
+  - /faillog:错误登录的账户信息
+  - /httpd/*:记录网络服务日志
+  - /samba/*:关于samba服务器的
+
+如果任由日志记录下去则会很大所以可以用logrotate来记录
+
+针对日志常需要的服务与程序有
+
+==rsyslogd的日志文件只要进行编辑过就不能继续记录,所有用vim查看的时候不要wq退出,重启rsyslog.service可以让他继续提供服务==
+
+- systemd-journald.service:最主要的信息记录者,内容在内存中可以使用journalctl来查看
+
+  - 通过journalctl来查看
+  - -n:显示几行
+  - -r:反向输出
+  - -p:后面所接重要性排序
+  - -f:tail -f的功能持续显示journal的内容
+  - --since --until 设置开始与结束时间
+  - _COMM=bash 只输出bash
+  - _PID=pid 只输出该pid的信息
+  - _UID=uid 只输出该uid的信息
+
+- rsyslog.service:主要收集登录系统与网络服务的信息
+
+  - 该服务的配置文件/etc/rsyslog.conf,为了将不同的信息放到不同的文件夹中
+
+  - ```bash
+    [root@YH ~]# cat /etc/rsyslog.conf | grep -v "^$" | grep -v "^#"
+    $ModLoad imuxsock # provides support for local system logging (e.g. via logger command)
+    $ModLoad imjournal # provides access to the systemd journal
+    $WorkDirectory /var/lib/rsyslog
+    $ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat
+    $IncludeConfig /etc/rsyslog.d/*.conf
+    $OmitLocalLogging on
+    $IMJournalStateFile imjournal.state
+    *.info;mail.none;authpriv.none;cron.none                /var/log/messages
+    authpriv.*                                              /var/log/secure
+    mail.*                                                  -/var/log/maillog
+    cron.*                                                  /var/log/cron
+    *.emerg                                                 :omusrmsg:*
+    uucp,news.crit                                          /var/log/spooler
+    local7.*                                                /var/log/boot.log
+    #格式一般为:
+    #服务名称 服务等级                                       信息记录的文件名与主机(可以是远程主机用@,用户,文件路径,打印设备,当前在线的所有人*)
+    ```
+
+  - 第九行代表mail,authpriv,cron产生的信息较多所以就不记录到/var/log/messages里面了
+
+  - 第十到十二行进行在对其进行了分类记录
+
+  - 第十三行如果发生了严重的错误以广播的方式给所有系统账号
+
+  - 十四行,早期unix的数据传递组
+
+  - 十五行,启动信息
+
+  - 第十一行中文件名前面的-代表先放入缓存等数据量大的时候再写入磁盘
+
+  - > 服务名称可以使用man 3 syslog查到(可是查到的与这里面的不大一样)    
+    >
+    > 默认格式为服务名称.服务等级(包含该等级以及更严重的等级都会按照这行的格式记录下来)但是还有别的关系式
+    >
+    > .=代表所需要的等级只有后面接的等级
+    >
+    > .!代表不等于,除了该等级以外的其他等级都记录
+
+- logrotate:主要进行日志文件轮询功能
+
+日志文件的一般格式:
+
+- 事件发生的日期与事件
+- 发生此事件的主机名
+- 启动此事件的服务名称
+- 内容
+
+例如
+
+```bash
+[root@YH ~]# journalctl 
+-- Logs begin at Fri 2021-09-24 16:26:44 CST, end at Mon 2021-09-27 10:49:08 CST. --
+Sep 24 16:26:44 VM-0-5-centos systemd[1]: Reloading.
+Sep 24 16:26:44 VM-0-5-centos rsyslogd[1232]: imjournal: journal reloaded... [v8.24.0-57.el7_9 try http://www.rsyslog.com/e/0 ]
+Sep 24 16:26:48 VM-0-5-centos dracut[1665]: *** Including module: qemu ***
+Sep 24 16:26:48 VM-0-5-centos dracut[1665]: *** Including module: fstab-sys ***
+Sep 24 16:26:48 VM-0-5-centos dracut[1665]: *** Including module: iscsi ***
+Sep 24 16:26:49 VM-0-5-centos dracut[1665]: *** Including module: rootfs-block ***
+Sep 24 16:26:49 VM-0-5-centos dracut[1665]: *** Including module: terminfo ***
+Sep 24 16:26:49 VM-0-5-centos dracut[1665]: *** Including module: udev-rules ***
+Sep 24 16:26:49 VM-0-5-centos dracut[1665]: Skipping udev rule: 40-redhat-cpu-hotplug.rules
+Sep 24 16:26:49 VM-0-5-centos dracut[1665]: Skipping udev rule: 91-permissions.rules
+Sep 24 16:26:49 VM-0-5-centos dracut[1665]: *** Including module: pollcdrom ***
+Sep 24 16:26:49 VM-0-5-centos dracut[1665]: *** Including module: systemd ***
+Sep 24 16:26:50 VM-0-5-centos dracut[1665]: *** Including module: usrmount ***
+Sep 24 16:26:50 VM-0-5-centos dracut[1665]: *** Including module: base ***
+Sep 24 16:26:50 VM-0-5-centos dracut[1665]: *** Including module: fs-lib ***
+Sep 24 16:26:50 VM-0-5-centos dracut[1665]: *** Including module: kdumpbase ***
+Sep 24 16:26:50 VM-0-5-centos dracut[1665]: *** Including module: shutdown ***
+
+```
+
+
+
+### logrotate
+
+#### 配置文件
+
+/etc/logrotate.conf:主要的参数文件,默认配置文件
+
+/etc/logrotate.d:文件目录
+
+logrotate会对每个日志文件进行记录备份,如果进行了三次备份就开始删除
+
+```bash
+[root@YH ~]# cat /etc/logrotate.conf | grep  "^[^#]" 
+weekly    #默认一周轮询一次
+rotate 4  #保留几个日志文件
+create    #由于日志文件被改名因此建立一个新的来存储是意思
+dateext   #轮询的文件名称会加上日期
+include /etc/logrotate.d #这个目录的所有文件都来执行轮询任务
+/var/log/wtmp { #针对这个目录所设置的参数
+    monthly
+    create 0664 root utmp
+	minsize 1M
+    rotate 1
+}
+/var/log/btmp {
+    missingok
+    monthly
+    create 0600 root utmp
+    rotate 1
+}
+```
+
+对于logrotate.d目录下的文件来说
+
+```bash
+[root@YH logrotate.d]# cat syslog 
+/var/log/cron
+/var/log/maillog
+/var/log/messages
+/var/log/secure
+/var/log/spooler
+{
+	sharedscripts
+	dateext
+	rotate 25
+	size 40M
+	compress
+	dateformat  -%Y%m%d%s
+	postrotate
+		/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+	endscript
+}
+
+#该文件结构为
+#文件名
+#{
+#  sharedscriptes
+# 执行的脚本prerotate在logrotate执行之前执行,postrotate在昨晚logrotate之后启动命令
+#  endscript
+#}
+```
+
+#### 例子
+
+如果要对/var/log/admin.log添加a+属性并且
+
+日志一个月轮询一次
+
+如果大于10M立即轮询
+
+保存5个文件
+
+备份压缩
+
+```bash
+[root@YH logrotate.d]# cat admin 
+/var/log/admin.log{
+	monthly
+	size=10M
+	rotate 5
+	compress
+	sharedscripts
+	prerotate
+		/usr/bin/chattr chattr -a /var/log/admin.log
+	endscript
+	sharedscripts
+	postrotate
+		/usr/bin/chattr chattr +a /var/log/admin.log
+	endscript
+}
+
+```
+
+
+
+
+
+## 内核源代码目录
+
+https://blog.csdn.net/zn2857/article/details/78804818
+
+
+
 ## 云服务器安装samba
 
 腾讯云为了安全禁用了samba的两个端口地址需要改映射
@@ -4324,6 +4602,10 @@ Install
 https://blog.csdn.net/zsdt345a780rfajwet/article/details/107845859
 
 
+
+## 日志文件服务器
+
+配置很简单就不做了
 
 
 
@@ -4429,6 +4711,7 @@ firewall-cmd --list-ports查看开启
   - /spool
     - /news(新闻组)
   - /log：非常重要，日志文件放置的目录
+    - /boot.log:记录系统检测与启动硬件信息
     - /wtmp这个文件用来存放登录数据
 - /run:系统启动后所产生的各项信息
 - /tmp:一般用户或正在执行的程序暂时放置文件的地方。任何人都可以存取，建议在启动时将本目录下数据都清除
@@ -4451,5 +4734,3 @@ firewall-cmd --list-ports查看开启
   - filesystems:Linux已经加载的文件系统类型
   - 数字目录都是进程中的pid比如/proc/1就是对应进程中pid为1的进程,里面存放着相关进程的信息
 - /sys:不占硬盘容量也是保存系统信息的.
-
-[^#]: 
