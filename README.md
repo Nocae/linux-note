@@ -1,6 +1,47 @@
  # Linux
 
 
+
+## 系统启动
+
+从RBM读取Boot Loader然后进行3个启动选择，再选择不同的boot loader来加载内核
+
+==安装双系统先装Windows再安装Linux，原因看下图右侧==
+
+![image-20210928101547761](C:\Users\lll\AppData\Roaming\Typora\typora-user-images\image-20210928101547761.png)
+
+
+
+如果Linux的boot loader获取控制权，进而会将内核根据boot loader加载到内存再对硬件设备进行再一次检测，一般内核文件放在/boot/vmlinuz
+
+```bash
+[root@YH boot]# ls --format=single-column -F
+config-3.10.0-1160.11.1.el7.x86_64							#此版本内核被编译时选择功能与模块的配置文件
+efi/											
+grub/														#旧版grub
+grub2/														#启动程序相关目录
+initramfs-0-rescue-3a6d3fd1db2b4ab6983389e8c068011e.img		#用来恢复的
+initramfs-3.10.0-1160.11.1.el7.x86_64.img					#正常启动会用到的
+initramfs-3.10.0-1160.11.1.el7.x86_64kdump.img				#内核出问题时用到
+symvers-3.10.0-1160.11.1.el7.x86_64.gz						
+System.map-3.10.0-1160.11.1.el7.x86_64						#内核功能放置到内存地址的对应表
+vmlinuz-0-rescue-3a6d3fd1db2b4ab6983389e8c068011e*			#恢复用的内核文件
+vmlinuz-3.10.0-1160.11.1.el7.x86_64*						#内核文件
+```
+
+Linux内核可以通过动态加载内核模块,这些内核放在/lib/modules目录==不可与内核放在不同的硬盘分区==
+
+>如果你使用SATA但是内核不认识SATA，所以需要SATA磁盘的驱动否则无法使用但是SATA放在/lib/modules内,所以根本无法获取驱动,这时就要用到虚拟文件系统
+>
+>这个一般是一个文件,可以被boot loader来加载到内存中而这个文件再内存中会被模拟成一个跟目录,这些一般都是磁盘的驱动程序
+>
+>文件名通常为/boot/initrd或/boot/initramfs
+>
+>详细内容可以使用man initrd来查看
+>
+>lsinitrd /boot/initramfs-3.10.0-1160.11.1.el7.x86_64.img查看文件内容
+
+
 ## 各种设备在linux的文件名
 
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/20190226160828364.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2xpdV9zaXNp,size_16,color_FFFFFF,t_70)
@@ -4587,7 +4628,283 @@ include /etc/logrotate.d #这个目录的所有文件都来执行轮询任务
 
 
 
+## 软件安装
 
+在软件源代码中makefile用来管理一系列哪些文件编译先编译哪些后编译
+
+make这个命令就需要makefile
+
+操作系统中最好安装make与autoconfig一个是用来编译的，另一个是用来检测是否有makefile文件
+
+
+
+### 常用安装软件
+
+RPM:Centos常用(软件管理):软件安装的环境必须与打包的环境需求一致或相当,满足软件依赖,反安装时需要特别小心最底层的软件不要先删除否则可能系统出现问题,不能安装其他Linux发行版本/var/lib/rpm
+
+> 为了解决不能安装其他的Linux发行版本出了个SRPM,里面包含源码,与Tarball不同的是这里面还包含所需要的依赖
+>
+> 先将软件以RPM的方式编译此时变成RPM文件
+>
+> 然后编译好的RPM安装到Linux中
+>
+> 文件名通常为.src.rpm
+
+dpkg:Ubuntu常用(软件管理)
+
+yum:Centos软件升级,更新/var/cache/yum
+
+apt-get:Ubuntu软件升级
+
+> https://www.cnblogs.com/gshelldon/p/13276253.html
+>
+> RPM包名解析
+
+
+
+#### RPM安装
+
+rpm -ivh XXXX.rpm
+
+- --nodeps:软件因为依赖问题无法安装但是执意安装
+- --replacefiles:已经安装在你的系统上面,又或者出现版本不合信息
+- --replacepkgs:某个软件已经安装过了
+- --force:上面两个的综合体
+- --test:测试找到依赖
+- --justdb:由于RPM数据库损坏或因为某些原因产生故障
+- --nosignaturn:跳过数字签名
+- --prefix 新路径:安装到非正规路径
+- --noscripts:不想让该软件在安装过程中自行执行某些系统命令
+
+
+
+#### RPM的升级与更新
+
+-Uvh:没有安装就安装,如果是旧版本直接更新
+
+-Fvh:没有安装不安装,只有已经安装的软件会升级
+
+
+
+#### RPM查询
+
+-qa:查询所有
+
+-q:仅仅查询后接软件是否安装
+
+-qi:列出软件的详细信息
+
+-ql:列出文件与目录所在的文件名
+
+-qc:列出配置文件
+
+-qd:列出所有说明文档
+
+-qR:列出软件的依赖
+
+-qf:找出该文件属于哪个已经安装的软件
+
+-q --scripts:列出是否包含需要安装后执行的脚本
+
+
+
+#### RPM认证与数字签名
+
+-V:后接软件名显示该软件被修改的内容
+
+-Va:显示所有软件被修改的内容
+
+-Vp:列出软件可能被修改的文件
+
+-Vf:显示某个文件是否被修改
+
+
+
+```bash
+[root@YH ~]# rpm -Va
+S.5....T.  c /etc/infiniband/openib.conf
+.......T.  c /etc/modprobe.d/ib_ipoib.conf
+.......T.    /etc/udev/rules.d/10-knem.rules
+S.5....T.  c /etc/NetworkManager/NetworkManager.conf
+missing     /var/run/abrt
+.M.......  g /var/lock/iscsi
+.M.......  g /var/lock/iscsi/lock
+....L....  c /etc/pam.d/fingerprint-auth
+....L....  c /etc/pam.d/password-auth
+....L....  c /etc/pam.d/postlogin
+....L....  c /etc/pam.d/smartcard-auth
+....L....  c /etc/pam.d/system-auth
+S.5....T.  c /etc/security/limits.conf
+S.5....T.  c /etc/security/limits.d/20-nproc.conf
+```
+
+前面几个字段
+
+S代表容量改变, M代表文件的属性或类型被改变, 5代表MD5这一种校验值的内容已经不同了, D代表主/次代码已经改变, L代表连接文件路径已经改变, U代表文件所属用户已经改变, G代表文件所属用户组已经改变, T代表文件的建立时间已经改变, P代表功能已经改变
+
+后面的代表c:配置文件 ,d:数据文件 ,g:幽灵文件(通常该文件不被某个软件所包含) ,l:许可认证文件 ,r:自述文件
+
+
+
+### Tarball
+
+由于是使用c语言写的所以大部分平台都可以使用
+
+在Centos或Red Hat中要安装一些tarball软件要选择Development Tools以及Kernel Source Development的相关包
+
+如果安装gcc等开发工具使用 yum groupinstall “Development Tools”
+
+如果安装图形用户界面支持一般还要安装，yum groupinstall “X Software Development”
+
+安装的软件较为旧则可能需要yum groupinstall “Legacy Software Development”
+
+
+
+#### 安装步骤
+
+1. 将tarball文件在/usr/local/src下面解压
+2. 查看解压下面的README/INSTALL并安装依赖(必要)
+3. 建立makefile:以自动检测程序测试操作系统环境(configure或config)
+4. 用make并用目录下的makefile作为参数
+5. 根据install这个目标的指定来安装到正确的路径
+
+
+
+安装时候运行的命令
+
+./configure:建立Makefile文件
+
+make clean (读取makefile中的clean工作,虽然不一定有效但是可以清除目标文件)
+
+make编译
+
+make install
+
+> 如果安装一个独立的目录,例如/usr/local/package这样需要将这个软件的man page手动写入/etc/man_db.conf中
+
+软件建议安装在/usr/local,而源代码安装在/usr/local/src
+
+
+
+#### Linux发行默认用到的路径
+
+以apache为例子:
+
+/etc/httpd	//配置文件
+
+/usr/lib	//函数库	
+
+/usr/bin	//执行文件
+
+/usr/share/man	//联机文档
+
+
+
+如果默认放在/usr/local里面就会可能变成(实际根据makefile)
+
+/usr/local/etc/
+
+/usr/local/lib/
+
+/usr/local/bin/
+
+/usr/local/man/
+
+
+
+因为Tarball反安装比较难所以建议
+
+- 将Tarball数据解压到/usr/local/src中
+- 安装时最好考虑安装到/usr/local这个默认目录
+- 考虑未来的反安装做好可以将每个软件单独安装在/usr/local下面
+- 为安装到单独目录的软件man Page加入man path查找(加入安装到/usr/local/software,那么在/etc/man_db.conf中大约40~50行写入MANPATH_MAP /usr/local/software)
+
+
+
+升级使用.patch文件来进行更新
+
+
+
+### 动态与静态函数库
+
+#### 静态
+
+- 扩展名一般为libXXX.a
+- 编译操作:文件会较大一些
+- 独立执行的状态
+- 如果想升级需要重新编译
+
+
+
+#### 动态
+
+- 扩展名一般为libXXX.so
+- 编译操作:由于只有一个指针被整合到执行文件中所以文件会比较小
+- 独立执行的状态:不能独立执行,程序需要去读取库函数,库函数的目录也不能改变
+- 如果要升级直接更换指向就可以了
+
+大部分函数库都是动态的
+
+函数库一般放在/lib与/lib64里面,内核的函数库放在/lib/modules里面
+
+
+
+#### 提高函数库的速度
+
+- 将函数库加载到告诉缓存中,必须将函数库写入/etc/ld.so.conf(这里面只能写入文件不能写入目录)
+- 利用idconfig来加载这个文件
+  - -f conf:使用conf来代替/etc/ld.so.conf
+  - -C cache:指定某个文件为高速缓存
+  - -p:列出目前所有的函数库内容
+- 同时将记录保存到/etc/ld.so.cache
+
+
+
+- ldd
+  - -v:列出所有内容信息
+  - -d:重新将数据有遗失的连接点显示出来
+  - -r:将ELF有关的错误内容显示出来
+
+
+
+
+
+## 最后的几个命令
+
+- nmcli:查看网络
+- timedatectl 时间查看 [set-time 时间]进行时间设置
+- ntpdate:时间矫正
+- localectl :查看语言 [set-locale LANG=语言]设置语言
+- dmidecode:查看硬件设备
+  - 常用检测硬件信息命令
+  - gdisk:分区
+  - dmesg:内核运行的各项信息
+  - vmstat:可分析系统目前的状态
+  - lspci:列出整个PC的PCI接口设备
+  - lsusb:列出USB信息
+  - iostat:列出整个CPU与连接的输入输出设备
+- smartd提供了smartctl命令来检测硬盘是好是坏
+
+### 备份
+
+推荐的备份目录
+
+- /etc
+- /home
+- /root
+- /var/spool/mail,/var/spool/cron/,/var/spool/at
+- /var/lib
+
+不推荐备份的目录
+
+- /dev
+- /proc,/sys,/run
+- /mnt,/media
+- /tmp
+
+常用备份工具dd、cpio、xfsdump、xfsrestore
+
+https://www.cnblogs.com/wanao/p/12838917.html
 
 ## 内核源代码目录
 
@@ -4648,6 +4965,8 @@ firewall-cmd --list-ports查看开启
 - /（root，根目录）：与启动系统有关
 - /usr（unix software resource）：与软件安装/执行有关
 - /var（variable）：与系统运行过程有关
+  - /lib
+    - /rpm:用来记录各种安装的软件
 
 根目录（/）的意义与内容
 
@@ -4683,6 +5002,7 @@ firewall-cmd --list-ports查看开启
     - /system/:管理员根据系统要求建立的脚本,优先级比/run/systemd/system高
   - /passwd:存放各个用户的信息
   - /shadow:存放个人密码
+  - /ld.so.conf:需要写入缓存的记录文件
   - /crontab:系统循环任务
   - /group:所有组个名在这里面
   - /locale.conf:可以修改系统语言
@@ -4720,7 +5040,7 @@ firewall-cmd --list-ports查看开启
     - /systemd
       - /system/:系统执行过程中所产生的服务脚本,优先级比/usr/lib/systemd/system高
 - /lib:(放置的是启动时会用到的库函数,以及在/bin和/sbin下面的命令会调用的库函数)
-  - /modules:放置驱动程序
+  - /modules:放置驱动程序(内核模块)
     - $(uname -r)/kernel/fs
       - 例如ext4驱动就在/lib/modules/$(uname -r)/kernel/fs/ext4下
 - /opt:(给第三方辅助软件放置的目录，以前的linux系统中，习惯安装在/usr/local下)
