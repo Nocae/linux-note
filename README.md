@@ -4746,6 +4746,171 @@ S代表容量改变, M代表文件的属性或类型被改变, 5代表MD5这一�
 
 
 
+安装数字签名
+
+> rpm --import 数字签名文件
+>
+> #查找数字前面方式
+>
+> locate GPG-KEY
+>
+> find '\*GPG-KEY\*'
+>
+> #首先使用这个查找数字签名的公钥
+>
+> rpm -qa | grep pubkey
+>
+> ```bash
+> [root@YH ~]# rpm -qa | grep pubkey
+> gpg-pubkey-352c64e5-52ae6884
+> gpg-pubkey-f4a80eb5-53a7ff4b
+> ```
+>
+> #在根据数字签名公钥名来查找
+>
+> ```bash
+> [root@YH ~]# rpm -qi  gpg-pubkey-352c64e5-52ae6884
+> Name        : gpg-pubkey
+> Version     : 352c64e5
+> Release     : 52ae6884
+> Architecture: (none)
+> Install Date: Tue 05 Nov 2019 10:55:36 PM CST
+> Group       : Public Keys
+> Size        : 0
+> License     : pubkey
+> Signature   : (none)
+> Source RPM  : (none)
+> Build Date  : Mon 16 Dec 2013 10:42:12 AM CST
+> Build Host  : localhost
+> Relocations : (not relocatable)
+> Packager    : Fedora EPEL (7) <epel@fedoraproject.org>
+> Summary     : gpg(Fedora EPEL (7) <epel@fedoraproject.org>)
+> Description :
+> -----BEGIN PGP PUBLIC KEY BLOCK-----
+> Version: rpm-4.11.3 (NSS-3)
+> 
+> mQINBFKuaIQBEAC1UphXwMqCAarPUH/ZsOFslabeTVO2pDk5YnO96f+rgZB7xArB
+> OSeQk7B90iqSJ85/c72OAn4OXYvT63gfCeXpJs5M7emXkPsNQWWSju99lW+AqSNm
+> jYWhmRlLRGl0OO7gIwj776dIXvcMNFlzSPj00N2xAqjMbjlnV2n2abAE5gq6VpqP
+> vFXVyfrVa/ualogDVmf6h2t4Rdpifq8qTHsHFU3xpCz+T6/dGWKGQ42ZQfTaLnDM
+> jToAsmY0AyevkIbX6iZVtzGvanYpPcWW4X0RDPcpqfFNZk643xI4lsZ+Y2Er9Yu5
+> S/8x0ly+tmmIokaE0wwbdUu740YTZjCesroYWiRg5zuQ2xfKxJoV5E+Eh+tYwGDJ
+> n6HfWhRgnudRRwvuJ45ztYVtKulKw8QQpd2STWrcQQDJaRWmnMooX/PATTjCBExB
+> 9dkz38Druvk7IkHMtsIqlkAOQMdsX1d3Tov6BE2XDjIG0zFxLduJGbVwc/6rIc95
+> T055j36Ez0HrjxdpTGOOHxRqMK5m9flFbaxxtDnS7w77WqzW7HjFrD0VeTx2vnjj
+> GqchHEQpfDpFOzb8LTFhgYidyRNUflQY35WLOzLNV+pV3eQ3Jg11UFwelSNLqfQf
+> uFRGc+zcwkNjHh5yPvm9odR1BIfqJ6sKGPGbtPNXo7ERMRypWyRz0zi0twARAQAB
+> tChGZWRvcmEgRVBFTCAoNykgPGVwZWxAZmVkb3JhcHJvamVjdC5vcmc+iQI4BBMB
+> AgAiBQJSrmiEAhsPBgsJCAcDAgYVCAIJCgsEFgIDAQIeAQIXgAAKCRBqL66iNSxk
+> 5cfGD/4spqpsTjtDM7qpytKLHKruZtvuWiqt5RfvT9ww9GUUFMZ4ZZGX4nUXg49q
+> ixDLayWR8ddG/s5kyOi3C0uX/6inzaYyRg+Bh70brqKUK14F1BrrPi29eaKfG+Gu
+> MFtXdBG2a7OtPmw3yuKmq9Epv6B0mP6E5KSdvSRSqJWtGcA6wRS/wDzXJENHp5re
+> 9Ism3CYydpy0GLRA5wo4fPB5uLdUhLEUDvh2KK//fMjja3o0L+SNz8N0aDZyn5Ax
+> CU9RB3EHcTecFgoy5umRj99BZrebR1NO+4gBrivIfdvD4fJNfNBHXwhSH9ACGCNv
+> HnXVjHQF9iHWApKkRIeh8Fr2n5dtfJEF7SEX8GbX7FbsWo29kXMrVgNqHNyDnfAB
+> VoPubgQdtJZJkVZAkaHrMu8AytwT62Q4eNqmJI1aWbZQNI5jWYqc6RKuCK6/F99q
+> thFT9gJO17+yRuL6Uv2/vgzVR1RGdwVLKwlUjGPAjYflpCQwWMAASxiv9uPyYPHc
+> ErSrbRG0wjIfAR3vus1OSOx3xZHZpXFfmQTsDP7zVROLzV98R3JwFAxJ4/xqeON4
+> vCPFU6OsT3lWQ8w7il5ohY95wmujfr6lk89kEzJdOTzcn7DBbUru33CQMGKZ3Evt
+> RjsC7FDbL017qxS+ZVA/HGkyfiu4cpgV8VUnbql5eAZ+1Ll6Dw==
+> =hdPa
+> -----END PGP PUBLIC KEY BLOCK-----
+> ```
+
+反安装一定要==从上层往下层==卸载,如果rpm数据库损坏可以使用rpm --rebuilddb来重建
+
+
+
+#### YUM
+
+- --installroot=/some/path:将软件安装在/some/path下面
+
+- -y:自动输入yes
+
+- search:查找软件名或者是描述的重要关键字
+
+- list:列出目前安装的所有
+
+- info:同上(数据更详细)
+
+  - ```bash
+    [root@YH ~]# yum info samba
+    Loaded plugins: fastestmirror, langpacks
+    Loading mirror speeds from cached hostfile
+    Installed Packages
+    Name        : samba            #软件名
+    Arch        : x86_64           #CPU硬件架构名
+    Version     : 4.10.16          #软件版本
+    Release     : 15.el7_9         #发布版本
+    Size        : 2.2 M
+    Repo        : installed        #安装状态
+    From repo   : updates
+    Summary     : Server and Client software to interoperate with Windows machines
+    URL         : http://www.samba.org/
+    License     : GPLv3+ and LGPLv3+
+    Description : Samba is the standard Windows interoperability suite of programs for Linux and
+                : Unix.
+    
+    ```
+
+- install
+
+- update
+
+- remove
+
+- repolist all:列出所有库源
+
+- grouplist:列出所有可使用的软件群组
+
+- groupinfo:后接groupname可以了解group内含的所有软件名
+
+- groupinstall:安装一组
+
+- groupremove:删除某个软件群组
+
+yum组群配置文件/etc/yum.conf有些组群中的软件因为是可选安装所以默认不安装,需要修改这个文件将可选安装改成默认安装
+
+
+
+yum配置文件位置 /etc/yum.repos.d/CentO S-Base.repo
+
+内容
+
+```bash
+[extras]
+gpgcheck=1
+gpgkey=http://mirrors.tencentyun.com/centos/RPM-GPG-KEY-CentOS-7
+enabled=1
+baseurl=http://mirrors.tencentyun.com/centos/$releasever/extras/$basearch/
+name=Qcloud centos extras - $basearch
+[os]
+gpgcheck=1
+gpgkey=http://mirrors.tencentyun.com/centos/RPM-GPG-KEY-CentOS-7
+enabled=1
+baseurl=http://mirrors.tencentyun.com/centos/$releasever/os/$basearch/
+name=Qcloud centos os - $basearch
+[updates]    #软件源名称不能重复不重要
+gpgcheck=1   #检查数字签名
+gpgkey=http://mirrors.tencentyun.com/centos/RPM-GPG-KEY-CentOS-7 #数字签名公钥位置
+enabled=1   #是否启用
+baseurl=http://mirrors.tencentyun.com/centos/$releasever/updates/$basearch/ #软件源实际位置
+name=Qcloud centos updates - $basearch  #说明一下名称
+~                                        
+```
+
+==如果你修改了软件源但是无用需要清空一些缓存yum clean [all|package|headers]==因为服务器会将软件信息先缓存放到/var/cache/yum里面
+
+
+
+#### 扩展软件源地址
+
+http://dl.fedoraproject.org/pub/epel/7/x86_64/
+
+还有ELRepo软件源
+
+
+
 ### Tarball
 
 由于是使用c语言写的所以大部分平台都可以使用
@@ -4783,6 +4948,31 @@ make install
 > 如果安装一个独立的目录,例如/usr/local/package这样需要将这个软件的man page手动写入/etc/man_db.conf中
 
 软件建议安装在/usr/local,而源代码安装在/usr/local/src
+
+
+
+### 使用RPM还是Tarball
+
+- 优先使用原厂的RPM功能
+- 使用软件官网发布的RPM或是提供的软件源地址
+- 使用Tarball安装特殊软件
+- 用Tarball测试软件,(如果已经有一个旧版本了但是防止新版本会导致什么问题所以可以使用Tarball来安装防止影响到原来的软件)
+
+
+
+#### 利用默认值安装SRPM文件(--rebuid/--recomplie)
+
+rpmbuild --rebuid 后接*.src.rpm文件(仅仅编译与打包)
+
+运行后生成一个*.rpm
+
+rpmbuild --recomplie 后接srpm文件(编译打包安装)
+
+rpmbuild -ba 软件:打包生成rpm与srpm
+
+rpmbuild -bb 软件:打包成rpm
+
+
 
 
 
@@ -5012,6 +5202,8 @@ firewall-cmd --list-ports查看开启
   - /pam.d:用来保存PAM的所有认证配置文件
   - /mdadm.conf
   - /services:定义端口与服务的映射
+  - /yum.repos.d
+    - /CentO S-Base.repo:yum配置文件
   - /profile.d
     - /*.sh:这里面所有的用户r权限的文件都会被/etc/profile调用,包含了操作界面的颜色、语系、别名等
   - /sysconfig
@@ -5020,6 +5212,7 @@ firewall-cmd --list-ports查看开启
 - /mnt:暂时挂载某些额外的设备
 - /var：系统运行后占用硬盘容量的目录
   - /cache:应用程序本身运行过程中产生的一些缓存
+    - /yum:yum软件缓存
   - /lib:程序本身执行过程中，需要使用到的数据文件放置的目录。此目录下各自软件要有各自的目录
     - /xfsdump
       - /inventory:xfsdump的备份记录
